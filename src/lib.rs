@@ -9,7 +9,7 @@
 //! ```
 
 use crate::error::ErrorReport;
-use ariadne::{Label, Report, ReportKind, Source};
+use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::Parser as _;
 use std::path::PathBuf;
 
@@ -94,7 +94,10 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
                 report.set_help(help);
             }
 
-            report.finish().eprint(Source::from(&input)).unwrap();
+            report
+                .finish()
+                .eprint(Source::from(&input))
+                .unwrap_or(eprintln!("{}", "failed to print error".fg(Color::Yellow)));
         });
 
     Err("compilation failed".into())
