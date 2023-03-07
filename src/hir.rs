@@ -1,451 +1,316 @@
 use crate::ast::{self, Ast};
-use crate::error::ErrorReport;
-use crate::Span;
-use std::cell::RefCell;
+use crate::Spanned;
 
-pub fn lower(ast: &Ast) -> (Option<Package>, Vec<ErrorReport>) {
-    let lowerer = Lowerer::new();
-
-    match lowerer.lower(ast) {
-        Ok(hir) => (Some(hir), Vec::new()),
-        Err(errs) => (None, errs),
-    }
+pub fn lower(ast: &Spanned<Ast>) -> Spanned<Hir> {
+    (
+        Hir {
+            items: (
+                ast.0
+                    .items
+                    .0
+                    .clone()
+                    .into_iter()
+                    .map(|item| lower_item(&item))
+                    .collect(),
+                ast.1.clone(),
+            ),
+        },
+        ast.1.clone(),
+    )
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Lowerer {
-    current_id: RefCell<usize>,
+fn lower_item(item: &Spanned<ast::Item>) -> Spanned<Item> {
+    (
+        match &item.0 {
+            ast::Item::Fn { sig, body } => Item::Fn {
+                sig: lower_function_signature(sig),
+                body: lower_statement(body),
+            },
+        },
+        item.1.clone(),
+    )
 }
 
-impl Lowerer {
-    pub fn new() -> Self {
-        Self {
-            current_id: RefCell::new(0),
-        }
-    }
-
-    fn next_id(&self) -> HirId {
-        let id = *self.current_id.borrow();
-        *self.current_id.borrow_mut() += 1;
-        HirId(id)
-    }
-
-    pub fn lower(&self, ast: &Ast) -> Result<Package, Vec<ErrorReport>> {
-        let mut package = Package {
-            id: self.next_id(),
-            span: ast.span.clone(),
-            modules: Vec::new(),
-        };
-
-        let mut module = Module {
-            id: self.next_id(),
-            span: ast.span.clone(),
-            items: Vec::new(),
-        };
-
-        for item in &ast.items {
-            module.items.push(self.lower_item(item));
-        }
-
-        package.modules.push(module);
-
-        Ok(package)
-    }
-
-    fn lower_item(&self, item: &ast::Item) -> Item {
-        let kind = match &item.kind {
-            ast::ItemKind::Fn(f) => ItemKind::Fn(self.lower_function(f)),
-        };
-
-        Item {
-            id: self.next_id(),
-            span: item.span.clone(),
-            kind,
-        }
-    }
-
-    fn lower_function(&self, func: &ast::Function) -> Function {
-        let sig = self.lower_function_signature(&func.sig);
-
-        let body = self.lower_statement(&func.body);
-
-        Function {
-            id: self.next_id(),
-            span: func.span.clone(),
-            sig,
-            body,
-        }
-    }
-
-    fn lower_function_signature(&self, sig: &ast::FunctionSignature) -> FunctionSignature {
-        let name = self.lower_ident(&sig.name);
-
-        let params = sig
-            .clone()
-            .params
-            .into_iter()
-            .map(|param| self.lower_param(&param))
-            .collect();
-
-        let ret_ty = self.lower_type(&sig.ret_ty);
-
+fn lower_function_signature(sig: &Spanned<ast::FunctionSignature>) -> Spanned<FunctionSignature> {
+    (
         FunctionSignature {
-            id: self.next_id(),
-            span: sig.span.clone(),
-            name,
-            params,
-            ret_ty,
-        }
-    }
+            name: lower_ident(&sig.0.name),
+            params: (
+                sig.0
+                    .params
+                    .0
+                    .clone()
+                    .into_iter()
+                    .map(|param| lower_param(&param))
+                    .collect(),
+                sig.0.params.1.clone(),
+            ),
+            ret_ty: lower_type(&sig.0.ret_ty),
+        },
+        sig.1.clone(),
+    )
+}
 
-    fn lower_param(&self, param: &ast::Param) -> Param {
-        let name = self.lower_ident(&param.name);
-
-        let ty = self.lower_type(&param.ty);
-
+fn lower_param(param: &Spanned<ast::Param>) -> Spanned<Param> {
+    (
         Param {
-            id: self.next_id(),
-            span: param.span.clone(),
-            name,
-            ty,
-        }
-    }
+            name: lower_ident(&param.0.name),
+            ty: lower_type(&param.0.ty),
+        },
+        param.1.clone(),
+    )
+}
 
-    fn lower_statement(&self, stmt: &ast::Statement) -> Statement {
-        let kind = match &stmt.kind {
-            ast::StatementKind::Block(stmts) => {
-                let stmts = stmts
-                    .iter()
-                    .map(|stmt| self.lower_statement(stmt))
-                    .collect();
-                StatementKind::Block(stmts)
+fn lower_statement(stmt: &Spanned<ast::Statement>) -> Spanned<Statement> {
+    (
+        match &stmt.0 {
+            ast::Statement::Block(stmts) => Statement::Block((
+                stmts.0.iter().map(|stmt| lower_statement(stmt)).collect(),
+                stmts.1.clone(),
+            )),
+            ast::Statement::Expr(expr) => Statement::Expr(lower_expr(expr)),
+            ast::Statement::VarDecl(name, ty, expr) => Statement::VarDecl(
+                lower_ident(name),
+                ty.as_ref().map(|ty| lower_type(ty)),
+                lower_expr(expr),
+            ),
+            ast::Statement::Assign(target, expr) => {
+                Statement::Assign(lower_assignment_target(target), lower_expr(expr))
             }
-            ast::StatementKind::Expr(expr) => StatementKind::Expr(self.lower_expr(expr)),
-            ast::StatementKind::VarDecl(name, ty, expr) => {
-                let name = self.lower_ident(name);
-                let ty = ty.as_ref().map(|ty| self.lower_type(ty));
-                let expr = self.lower_expr(expr);
-
-                StatementKind::VarDecl(name, ty, expr)
+            ast::Statement::Return(expr) => {
+                Statement::Return(expr.as_ref().map(|expr| lower_expr(expr)))
             }
-            ast::StatementKind::Assign(target, expr) => {
-                let target = self.lower_assignment_target(target);
-                let expr = self.lower_expr(expr);
+            ast::Statement::IfElse { cond, then, else_ } => Statement::IfElse {
+                cond: lower_expr(cond),
+                then: Box::new(lower_statement(then)),
+                else_: else_.as_ref().map(|else_| Box::new(lower_statement(else_))),
+            },
+            ast::Statement::While { cond, body } => {
+                let cond = lower_expr(cond);
+                let body = lower_statement(body);
 
-                StatementKind::Assign(target, expr)
+                let if_true_break_else_body = Statement::IfElse {
+                    cond: (
+                        Expr::Binary {
+                            lhs: Box::new(cond.clone()),
+                            op: (BinaryOp::Eq, cond.1.clone()),
+                            rhs: Box::new((
+                                Expr::Literal((Literal::Bool(false), stmt.1.clone())),
+                                cond.1.clone(),
+                            )),
+                        },
+                        cond.1.clone(),
+                    ),
+                    then: Box::new((Statement::Break, cond.1.clone())),
+                    else_: Some(Box::new(body)),
+                };
+
+                Statement::Loop(Box::new((if_true_break_else_body, stmt.1.clone())))
             }
-            ast::StatementKind::Return(expr) => {
-                let expr = expr.as_ref().map(|expr| self.lower_expr(expr));
+            ast::Statement::For { var, in_, body } => Statement::For {
+                var: lower_ident(var),
+                in_: lower_expr(in_),
+                body: Box::new(lower_statement(body)),
+            },
+            ast::Statement::Break => Statement::Break,
+            ast::Statement::Continue => Statement::Continue,
+            ast::Statement::Loop(stmt) => Statement::Loop(Box::new(lower_statement(stmt))),
+        },
+        stmt.1.clone(),
+    )
+}
 
-                StatementKind::Return(expr)
+fn lower_expr(expr: &Spanned<ast::Expr>) -> Spanned<Expr> {
+    (
+        match &expr.0 {
+            ast::Expr::Error => Expr::Error,
+            ast::Expr::Literal(l) => Expr::Literal(lower_literal(l)),
+            ast::Expr::Var(name) => Expr::Var(lower_ident(name)),
+            ast::Expr::List(exprs) => Expr::List((
+                exprs.0.iter().map(|expr| lower_expr(expr)).collect(),
+                exprs.1.clone(),
+            )),
+            ast::Expr::Binary { lhs, op, rhs } => Expr::Binary {
+                lhs: Box::new(lower_expr(lhs)),
+                op: lower_binary_op(op),
+                rhs: Box::new(lower_expr(rhs)),
+            },
+            ast::Expr::Prefix { op, expr } => Expr::Prefix {
+                op: lower_prefix_op(op),
+                expr: Box::new(lower_expr(expr)),
+            },
+            ast::Expr::Postfix { expr, op } => Expr::Postfix {
+                expr: Box::new(lower_expr(expr)),
+                op: lower_postfix_op(op),
+            },
+        },
+        expr.1.clone(),
+    )
+}
+
+fn lower_binary_op(op: &Spanned<ast::BinaryOp>) -> Spanned<BinaryOp> {
+    (
+        match &op.0 {
+            ast::BinaryOp::Add => BinaryOp::Add,
+            ast::BinaryOp::Sub => BinaryOp::Sub,
+            ast::BinaryOp::Mul => BinaryOp::Mul,
+            ast::BinaryOp::Div => BinaryOp::Div,
+            ast::BinaryOp::Range => BinaryOp::Range,
+            ast::BinaryOp::Eq => BinaryOp::Eq,
+            ast::BinaryOp::Neq => BinaryOp::Neq,
+            ast::BinaryOp::Lt => BinaryOp::Lt,
+            ast::BinaryOp::Gt => BinaryOp::Gt,
+            ast::BinaryOp::Lte => BinaryOp::Lte,
+            ast::BinaryOp::Gte => BinaryOp::Gte,
+        },
+        op.1.clone(),
+    )
+}
+
+fn lower_prefix_op(op: &Spanned<ast::PrefixOp>) -> Spanned<PrefixOp> {
+    (
+        match &op.0 {
+            ast::PrefixOp::Pos => PrefixOp::Pos,
+            ast::PrefixOp::Neg => PrefixOp::Neg,
+        },
+        op.1.clone(),
+    )
+}
+
+fn lower_postfix_op(op: &Spanned<ast::PostfixOp>) -> Spanned<PostfixOp> {
+    (
+        match &op.0 {
+            ast::PostfixOp::Error => PostfixOp::Error,
+            ast::PostfixOp::Call(exprs) => PostfixOp::Call((
+                exprs.0.iter().map(|expr| lower_expr(expr)).collect(),
+                exprs.1.clone(),
+            )),
+            ast::PostfixOp::Index(expr) => {
+                let expr = Box::new(lower_expr(expr));
+                PostfixOp::Index(expr)
             }
-            ast::StatementKind::IfElse { cond, then, else_ } => {
-                let cond = self.lower_expr(cond);
-                let then = Box::new(self.lower_statement(then));
-                let else_ = else_
-                    .as_ref()
-                    .map(|else_| Box::new(self.lower_statement(else_)));
+        },
+        op.1.clone(),
+    )
+}
 
-                StatementKind::IfElse { cond, then, else_ }
+fn lower_literal(lit: &Spanned<ast::Literal>) -> Spanned<Literal> {
+    (
+        match lit.0 {
+            ast::Literal::Int(i) => Literal::Int(i),
+            ast::Literal::Float(f) => Literal::Float(f),
+            ast::Literal::Bool(b) => Literal::Bool(b),
+        },
+        lit.1.clone(),
+    )
+}
+
+fn lower_ident(ident: &Spanned<ast::Ident>) -> Spanned<Ident> {
+    ident.clone()
+}
+
+fn lower_assignment_target(target: &Spanned<ast::AssignmentTarget>) -> Spanned<AssignmentTarget> {
+    (
+        match &target.0 {
+            ast::AssignmentTarget::Var(i) => AssignmentTarget::Var(lower_ident(i)),
+            ast::AssignmentTarget::Index(target, expr) => {
+                let target = lower_assignment_target(target);
+                let expr = lower_expr(expr);
+
+                AssignmentTarget::Index(Box::new(target), Box::new(expr))
             }
-            ast::StatementKind::While { cond, stmt } => {
-                let cond = self.lower_expr(cond);
-                let stmt = Box::new(self.lower_statement(stmt));
+        },
+        target.1.clone(),
+    )
+}
 
-                StatementKind::While { cond, stmt }
-            }
-            ast::StatementKind::For { var, in_, stmt } => {
-                let var = self.lower_ident(var);
-                let in_ = self.lower_expr(in_);
-                let stmt = Box::new(self.lower_statement(stmt));
-
-                StatementKind::For { var, in_, stmt }
-            }
-            ast::StatementKind::Break => StatementKind::Break,
-            ast::StatementKind::Continue => StatementKind::Continue,
-            ast::StatementKind::Loop(stmt) => {
-                let stmt = Box::new(self.lower_statement(stmt));
-
-                StatementKind::Loop(stmt)
-            }
-        };
-
-        Statement {
-            id: self.next_id(),
-            span: stmt.span.clone(),
-            kind,
-        }
-    }
-
-    fn lower_expr(&self, expr: &ast::Expr) -> Expr {
-        let kind = match &expr.kind {
-            ast::ExprKind::Error => unreachable!(),
-            ast::ExprKind::Literal(l) => ExprKind::Literal(self.lower_literal(l)),
-            ast::ExprKind::Var(name) => ExprKind::Var(self.lower_ident(name)),
-            ast::ExprKind::List(exprs) => {
-                let exprs = exprs.iter().map(|expr| self.lower_expr(expr)).collect();
-                ExprKind::List(exprs)
-            }
-            ast::ExprKind::Binary { lhs, op, rhs } => {
-                let lhs = Box::new(self.lower_expr(lhs));
-                let op = self.lower_binary_op(op);
-                let rhs = Box::new(self.lower_expr(rhs));
-
-                ExprKind::Binary { lhs, op, rhs }
-            }
-            ast::ExprKind::Prefix { op, expr } => {
-                let op = self.lower_prefix_op(op);
-                let expr = Box::new(self.lower_expr(expr));
-
-                ExprKind::Prefix { op, expr }
-            }
-            ast::ExprKind::Postfix { expr, op } => {
-                let expr = Box::new(self.lower_expr(expr));
-                let op = self.lower_postfix_op(op);
-
-                ExprKind::Postfix { expr, op }
-            }
-        };
-
-        Expr {
-            id: self.next_id(),
-            span: expr.span.clone(),
-            kind,
-        }
-    }
-
-    fn lower_binary_op(&self, op: &ast::BinaryOp) -> BinaryOp {
-        let kind = match &op.kind {
-            ast::BinaryOpKind::Add => BinaryOpKind::Add,
-            ast::BinaryOpKind::Sub => BinaryOpKind::Sub,
-            ast::BinaryOpKind::Mul => BinaryOpKind::Mul,
-            ast::BinaryOpKind::Div => BinaryOpKind::Div,
-            ast::BinaryOpKind::Range => BinaryOpKind::Range,
-            ast::BinaryOpKind::Eq => BinaryOpKind::Eq,
-            ast::BinaryOpKind::Neq => BinaryOpKind::Neq,
-            ast::BinaryOpKind::Lt => BinaryOpKind::Lt,
-            ast::BinaryOpKind::Gt => BinaryOpKind::Gt,
-            ast::BinaryOpKind::Lte => BinaryOpKind::Lte,
-            ast::BinaryOpKind::Gte => BinaryOpKind::Gte,
-        };
-
-        BinaryOp {
-            id: self.next_id(),
-            span: op.span.clone(),
-            kind,
-        }
-    }
-
-    fn lower_prefix_op(&self, op: &ast::PrefixOp) -> PrefixOp {
-        let kind = match &op.kind {
-            ast::PrefixOpKind::Pos => PrefixOpKind::Pos,
-            ast::PrefixOpKind::Neg => PrefixOpKind::Neg,
-        };
-
-        PrefixOp {
-            id: self.next_id(),
-            span: op.span.clone(),
-            kind,
-        }
-    }
-
-    fn lower_postfix_op(&self, op: &ast::PostfixOp) -> PostfixOp {
-        let kind = match &op.kind {
-            ast::PostfixOpKind::Error => unreachable!(),
-            ast::PostfixOpKind::Call(exprs) => {
-                let exprs = exprs.iter().map(|expr| self.lower_expr(expr)).collect();
-                PostfixOpKind::Call(exprs)
-            }
-            ast::PostfixOpKind::Index(expr) => {
-                let expr = Box::new(self.lower_expr(expr));
-                PostfixOpKind::Index(expr)
-            }
-        };
-
-        PostfixOp {
-            id: self.next_id(),
-            span: op.span.clone(),
-            kind,
-        }
-    }
-
-    fn lower_literal(&self, lit: &ast::Literal) -> Literal {
-        match &lit {
-            ast::Literal::Int(i) => Literal::Int(*i),
-            ast::Literal::Float(f) => Literal::Float(*f),
-            ast::Literal::Bool(b) => Literal::Bool(*b),
-        }
-    }
-
-    fn lower_ident(&self, ident: &ast::Ident) -> Ident {
-        Ident {
-            id: self.next_id(),
-            span: ident.span.clone(),
-            name: ident.name.clone(),
-        }
-    }
-
-    fn lower_assignment_target(&self, target: &ast::AssignmentTarget) -> AssignmentTarget {
-        let kind = match &target.kind {
-            ast::AssignmentTargetKind::Var(i) => AssignmentTargetKind::Var(self.lower_ident(i)),
-            ast::AssignmentTargetKind::Index(target, expr) => {
-                let target = self.lower_assignment_target(target);
-                let expr = self.lower_expr(expr);
-
-                AssignmentTargetKind::Index(Box::new(target), Box::new(expr))
-            }
-        };
-
-        AssignmentTarget {
-            id: self.next_id(),
-            span: target.span.clone(),
-            kind,
-        }
-    }
-
-    fn lower_type(&self, ty: &ast::Type) -> Type {
-        let kind = match &ty.kind {
-            ast::TypeKind::Unit => TypeKind::Unit,
-            ast::TypeKind::Ident(i) => TypeKind::Ident(self.lower_ident(i)),
-            ast::TypeKind::Int => TypeKind::Int,
-            ast::TypeKind::Float => TypeKind::Float,
-            ast::TypeKind::Bool => TypeKind::Bool,
-            ast::TypeKind::List(l) => TypeKind::List(Box::new(self.lower_type(l))),
-        };
-
-        Type {
-            id: self.next_id(),
-            span: ty.span.clone(),
-            kind,
-        }
-    }
+fn lower_type(ty: &Spanned<ast::Type>) -> Spanned<Type> {
+    (
+        match &ty.0 {
+            ast::Type::Unit => Type::Unit,
+            ast::Type::Ident(i) => Type::Ident(lower_ident(i)),
+            ast::Type::Int => Type::Int,
+            ast::Type::Float => Type::Float,
+            ast::Type::Bool => Type::Bool,
+            ast::Type::List(l) => Type::List(Box::new(lower_type(l))),
+        },
+        ty.1.clone(),
+    )
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct HirId(pub usize);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Package {
-    pub id: HirId,
-    pub span: Span,
-    pub modules: Vec<Module>,
+pub struct Hir {
+    pub items: Spanned<Vec<Spanned<Item>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Module {
-    pub id: HirId,
-    pub span: Span,
-    pub items: Vec<Item>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Item {
-    pub id: HirId,
-    pub span: Span,
-    pub kind: ItemKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ItemKind {
-    Fn(Function),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Function {
-    pub id: HirId,
-    pub span: Span,
-    pub sig: FunctionSignature,
-    pub body: Statement,
+pub enum Item {
+    Fn {
+        sig: Spanned<FunctionSignature>,
+        body: Spanned<Statement>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionSignature {
-    pub id: HirId,
-    pub span: Span,
-    pub name: Ident,
-    pub params: Vec<Param>,
-    pub ret_ty: Type,
+    pub name: Spanned<Ident>,
+    pub params: Spanned<Vec<Spanned<Param>>>,
+    pub ret_ty: Spanned<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Param {
-    pub id: HirId,
-    pub span: Span,
-    pub name: Ident,
-    pub ty: Type,
+    pub name: Spanned<Ident>,
+    pub ty: Spanned<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Statement {
-    pub id: HirId,
-    pub span: Span,
-    pub kind: StatementKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum StatementKind {
-    Block(Vec<Statement>),
-    Expr(Expr),
-    VarDecl(Ident, Option<Type>, Expr),
-    Assign(AssignmentTarget, Expr),
-    Return(Option<Expr>),
+pub enum Statement {
+    Block(Spanned<Vec<Spanned<Self>>>),
+    Expr(Spanned<Expr>),
+    VarDecl(Spanned<Ident>, Option<Spanned<Type>>, Spanned<Expr>),
+    Assign(Spanned<AssignmentTarget>, Spanned<Expr>),
+    Return(Option<Spanned<Expr>>),
     IfElse {
-        cond: Expr,
-        then: Box<Statement>,
-        else_: Option<Box<Statement>>,
-    },
-    While {
-        cond: Expr,
-        stmt: Box<Statement>,
+        cond: Spanned<Expr>,
+        then: Box<Spanned<Self>>,
+        else_: Option<Box<Spanned<Self>>>,
     },
     For {
-        var: Ident,
-        in_: Expr,
-        stmt: Box<Statement>,
+        var: Spanned<Ident>,
+        in_: Spanned<Expr>,
+        body: Box<Spanned<Self>>,
     },
     Break,
     Continue,
-    Loop(Box<Statement>),
+    Loop(Box<Spanned<Self>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Expr {
-    pub id: HirId,
-    pub span: Span,
-    pub kind: ExprKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ExprKind {
-    Literal(Literal),
-    Var(Ident),
-    List(Vec<Expr>),
+pub enum Expr {
+    Error,
+    Literal(Spanned<Literal>),
+    Var(Spanned<Ident>),
+    List(Spanned<Vec<Spanned<Self>>>),
     Binary {
-        lhs: Box<Expr>,
-        op: BinaryOp,
-        rhs: Box<Expr>,
+        lhs: Box<Spanned<Self>>,
+        op: Spanned<BinaryOp>,
+        rhs: Box<Spanned<Self>>,
     },
     Prefix {
-        op: PrefixOp,
-        expr: Box<Expr>,
+        op: Spanned<PrefixOp>,
+        expr: Box<Spanned<Self>>,
     },
     Postfix {
-        expr: Box<Expr>,
-        op: PostfixOp,
+        expr: Box<Spanned<Self>>,
+        op: Spanned<PostfixOp>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct AssignmentTarget {
-    pub id: HirId,
-    pub span: Span,
-    pub kind: AssignmentTargetKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum AssignmentTargetKind {
-    Var(Ident),
-    Index(Box<AssignmentTarget>, Box<Expr>),
+pub enum AssignmentTarget {
+    Var(Spanned<Ident>),
+    Index(Box<Spanned<Self>>, Box<Spanned<Expr>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -456,31 +321,17 @@ pub enum Literal {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Type {
-    pub id: HirId,
-    pub span: Span,
-    pub kind: TypeKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TypeKind {
+pub enum Type {
     Unit,
-    Ident(Ident),
+    Ident(Spanned<Ident>),
     Int,
     Float,
     Bool,
-    List(Box<Type>),
+    List(Box<Spanned<Self>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct BinaryOp {
-    pub id: HirId,
-    pub span: Span,
-    pub kind: BinaryOpKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum BinaryOpKind {
+pub enum BinaryOp {
     Add,
     Sub,
     Mul,
@@ -495,34 +346,16 @@ pub enum BinaryOpKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PrefixOp {
-    pub id: HirId,
-    pub span: Span,
-    pub kind: PrefixOpKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum PrefixOpKind {
+pub enum PrefixOp {
     Pos,
     Neg,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PostfixOp {
-    pub id: HirId,
-    pub span: Span,
-    pub kind: PostfixOpKind,
+pub enum PostfixOp {
+    Error,
+    Call(Spanned<Vec<Spanned<Expr>>>),
+    Index(Box<Spanned<Expr>>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum PostfixOpKind {
-    Call(Vec<Expr>),
-    Index(Box<Expr>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Ident {
-    pub id: HirId,
-    pub span: Span,
-    pub name: String,
-}
+pub type Ident = String;

@@ -46,14 +46,14 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         dbg!(&ast);
     }
 
-    let (hir, lower_errs) = if parse_errs.is_empty() {
+    let hir = if parse_errs.is_empty() {
         if let Some(ast) = ast {
-            hir::lower(&ast)
+            Some(hir::lower(&ast))
         } else {
-            (None, Vec::new())
+            None
         }
     } else {
-        (None, Vec::new())
+        None
     };
 
     if config.debug_hir {
@@ -74,7 +74,6 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
                 .map(|e| e.map(|tok| tok.to_string()))
                 .map(Into::into),
         )
-        .chain(lower_errs.into_iter())
         .for_each(|e: ErrorReport| {
             let mut report = Report::build(ReportKind::Error, (), e.offset())
                 .with_code(e.code().0.clone())
@@ -104,6 +103,8 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub type Span = std::ops::Range<usize>;
+
+pub type Spanned<T> = (T, Span);
 
 /// The configuration for the compiler. It is used to pass
 /// information from the command line to the compiler.
