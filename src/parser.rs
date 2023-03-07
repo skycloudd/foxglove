@@ -157,6 +157,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             Token::Int(n) => Literal::Int(n.parse().unwrap_or(0)),
             Token::Float(n) => Literal::Float(n.parse().unwrap_or(0.0)),
             Token::Bool(b) => Literal::Bool(b),
+            Token::Control(Control::Unit) => Literal::Unit,
         }
         .map_with_span(|lit, span| (lit, span))
         .map_with_span(|lit, span| (Expr::Literal(lit), span));

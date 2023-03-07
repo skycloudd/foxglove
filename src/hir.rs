@@ -197,6 +197,7 @@ fn lower_postfix_op(op: &Spanned<ast::PostfixOp>) -> Spanned<PostfixOp> {
 fn lower_literal(lit: &Spanned<ast::Literal>) -> Spanned<Literal> {
     (
         match lit.0 {
+            ast::Literal::Unit => Literal::Unit,
             ast::Literal::Int(i) => Literal::Int(i),
             ast::Literal::Float(f) => Literal::Float(f),
             ast::Literal::Bool(b) => Literal::Bool(b),
@@ -315,6 +316,7 @@ pub enum AssignmentTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
+    Unit,
     Int(i64),
     Float(f64),
     Bool(bool),

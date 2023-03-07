@@ -81,6 +81,7 @@ pub enum AssignmentTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
+    Unit,
     Int(i64),
     Float(f64),
     Bool(bool),
