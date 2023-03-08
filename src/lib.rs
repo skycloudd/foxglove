@@ -17,12 +17,14 @@ mod ast;
 mod error;
 mod hir;
 mod lexer;
+mod lower;
 mod parser;
+mod typecheck;
+mod typed_hir;
 
 /// The main entry point for the compiler.
-/// It goes through every stage sequentially and only continues to the
-/// next stage if the previous stage returned no errors and a `Some` variant.
-/// Otherwise it skips everything and prints the errors and exits.
+/// It goes through every stage sequentially
+/// If a stage fails, it should go straight to the error reporting stage
 pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     let input = std::fs::read_to_string(config.filename)?;
 
@@ -47,13 +49,26 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let hir = if parse_errs.is_empty() {
-        ast.map(|ast| hir::lower(&ast))
+        ast.map(|ast| lower::lower(&ast))
     } else {
         None
     };
 
     if config.debug_hir {
         dbg!(&hir);
+    }
+
+    let (typed_hir, typecheck_errs) = if let Some(hir) = hir {
+        match typecheck::typecheck(&hir) {
+            Ok(typed_hir) => (Some(typed_hir), Vec::new()),
+            Err(e) => (None, vec![e]),
+        }
+    } else {
+        (None, Vec::new())
+    };
+
+    if config.debug_thir {
+        dbg!(&typed_hir);
     }
 
     Vec::new()
@@ -70,6 +85,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
                 .map(|e| e.map(|tok| tok.to_string()))
                 .map(Into::into),
         )
+        .chain(typecheck_errs)
         .for_each(|e: ErrorReport| {
             let mut report = Report::build(ReportKind::Error, (), e.offset())
                 .with_code(e.code().0.clone())
@@ -110,17 +126,25 @@ pub struct Config {
     debug_tokens: bool,
     debug_ast: bool,
     debug_hir: bool,
+    debug_thir: bool,
 }
 
 impl Config {
     /// Creates a new `Config` from a filename.
     #[must_use]
-    pub fn new(filename: PathBuf, debug_tokens: bool, debug_ast: bool, debug_hir: bool) -> Self {
+    pub fn new(
+        filename: PathBuf,
+        debug_tokens: bool,
+        debug_ast: bool,
+        debug_hir: bool,
+        debug_thir: bool,
+    ) -> Self {
         Self {
             filename,
             debug_tokens,
             debug_ast,
             debug_hir,
+            debug_thir,
         }
     }
 }

@@ -1,4 +1,5 @@
-use crate::Span;
+use crate::typecheck::TypeInfo;
+use crate::{Span, Spanned};
 use ariadne::{Color, Fmt, Span as _};
 use chumsky::error::SimpleReason;
 use chumsky::prelude::Simple;
@@ -29,7 +30,7 @@ impl Report {
         }
     }
 
-    fn custom(span: Span, msg: &str) -> Self {
+    pub fn custom(span: Span, msg: &str) -> Self {
         Self::new(
             msg.to_owned(),
             ErrorKind::Custom.into(),
@@ -90,6 +91,29 @@ impl Report {
                         found.unwrap_or("end of file").fg(Color::Yellow)
                     ),
                 ),
+            ],
+            None,
+            None,
+        )
+    }
+
+    pub fn cannot_infer_type(span: Span) -> Self {
+        Self::new(
+            "Cannot infer type".to_owned(),
+            ErrorKind::CannotInferType.into(),
+            vec![ActualError::new(span, "Cannot infer type".to_owned())],
+            None,
+            None,
+        )
+    }
+
+    pub fn type_conflict(one: Spanned<TypeInfo>, two: Spanned<TypeInfo>) -> Self {
+        Self::new(
+            "Type conflict".to_owned(),
+            ErrorKind::TypeConflict.into(),
+            vec![
+                ActualError::new(one.1, format!("This type `{}`", one.0)),
+                ActualError::new(two.1, format!("This type `{}`", two.0)),
             ],
             None,
             None,
@@ -167,6 +191,8 @@ enum ErrorKind {
     Custom,
     Unexpected,
     Unclosed,
+    CannotInferType,
+    TypeConflict,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -180,6 +206,8 @@ impl From<ErrorKind> for Code {
                 ErrorKind::Custom => 1,
                 ErrorKind::Unexpected => 2,
                 ErrorKind::Unclosed => 3,
+                ErrorKind::CannotInferType => 4,
+                ErrorKind::TypeConflict => 5,
             }
         ))
     }

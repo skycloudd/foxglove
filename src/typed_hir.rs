@@ -1,7 +1,7 @@
 use crate::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Hir {
+pub struct TypedHir {
     pub items: Spanned<Vec<Spanned<Item>>>,
 }
 
@@ -30,7 +30,7 @@ pub struct Param {
 pub enum Statement {
     Block(Spanned<Vec<Spanned<Self>>>),
     Expr(Spanned<Expr>),
-    VarDecl(Spanned<Ident>, Option<Spanned<Type>>, Spanned<Expr>),
+    VarDecl(Spanned<Ident>, Spanned<Type>, Spanned<Expr>),
     Assign(Spanned<AssignmentTarget>, Spanned<Expr>),
     Return(Option<Spanned<Expr>>),
     IfElse {
@@ -49,7 +49,13 @@ pub enum Statement {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
+pub struct Expr {
+    pub kind: ExprKind,
+    pub ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExprKind {
     Error,
     Literal(Spanned<Literal>),
     Var(Spanned<Ident>),
@@ -81,17 +87,6 @@ pub enum Literal {
     Int(i64),
     Float(f64),
     Bool(bool),
-}
-
-impl Literal {
-    pub fn ty(&self) -> Type {
-        match self {
-            Literal::Unit => Type::Unit,
-            Literal::Int(_) => Type::Int,
-            Literal::Float(_) => Type::Float,
-            Literal::Bool(_) => Type::Bool,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

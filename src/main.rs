@@ -32,10 +32,13 @@ struct Args {
 
     #[clap(short = 'H', long)]
     hir: bool,
+
+    #[clap(short = 'T', long)]
+    thir: bool,
 }
 
 impl From<Args> for Config {
     fn from(args: Args) -> Self {
-        Self::new(args.filename, args.tokens, args.ast, args.hir)
+        Self::new(args.filename, args.tokens, args.ast, args.hir, args.thir)
     }
 }
