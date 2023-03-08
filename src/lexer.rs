@@ -106,16 +106,14 @@ pub enum Token {
     Control(Control),
 }
 
-impl std::fmt::Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Token {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Token::Ident(ident) => write!(f, "{ident}"),
-            Token::Int(n) => write!(f, "{n}"),
-            Token::Float(n) => write!(f, "{n}"),
-            Token::Bool(b) => write!(f, "{b}"),
-            Token::Keyword(kw) => write!(f, "{kw}"),
-            Token::Operator(op) => write!(f, "{op}"),
-            Token::Control(ctrl) => write!(f, "{ctrl}"),
+            Token::Ident(v) | Token::Int(v) | Token::Float(v) => write!(f, "{v}"),
+            Token::Bool(v) => write!(f, "{v}"),
+            Token::Keyword(v) => write!(f, "{v}"),
+            Token::Operator(v) => write!(f, "{v}"),
+            Token::Control(v) => write!(f, "{v}"),
         }
     }
 }
@@ -135,8 +133,8 @@ pub enum Keyword {
     Loop,
 }
 
-impl std::fmt::Display for Keyword {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Keyword {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Keyword::Return => write!(f, "return"),
             Keyword::Var => write!(f, "var"),
@@ -168,8 +166,8 @@ pub enum Operator {
     Neq,
 }
 
-impl std::fmt::Display for Operator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Operator {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Operator::Plus => write!(f, "+"),
             Operator::Minus => write!(f, "-"),
@@ -203,8 +201,8 @@ pub enum Control {
     Unit,
 }
 
-impl std::fmt::Display for Control {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Control {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Control::OpenParen => write!(f, "("),
             Control::CloseParen => write!(f, ")"),

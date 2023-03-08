@@ -65,21 +65,19 @@ fn lower_statement(stmt: &Spanned<ast::Statement>) -> Spanned<Statement> {
     (
         match &stmt.0 {
             ast::Statement::Block(stmts) => Statement::Block((
-                stmts.0.iter().map(|stmt| lower_statement(stmt)).collect(),
+                stmts.0.iter().map(lower_statement).collect(),
                 stmts.1.clone(),
             )),
             ast::Statement::Expr(expr) => Statement::Expr(lower_expr(expr)),
             ast::Statement::VarDecl(name, ty, expr) => Statement::VarDecl(
                 lower_ident(name),
-                ty.as_ref().map(|ty| lower_type(ty)),
+                ty.as_ref().map(lower_type),
                 lower_expr(expr),
             ),
             ast::Statement::Assign(target, expr) => {
                 Statement::Assign(lower_assignment_target(target), lower_expr(expr))
             }
-            ast::Statement::Return(expr) => {
-                Statement::Return(expr.as_ref().map(|expr| lower_expr(expr)))
-            }
+            ast::Statement::Return(expr) => Statement::Return(expr.as_ref().map(lower_expr)),
             ast::Statement::IfElse { cond, then, else_ } => Statement::IfElse {
                 cond: lower_expr(cond),
                 then: Box::new(lower_statement(then)),
@@ -101,7 +99,7 @@ fn lower_statement(stmt: &Spanned<ast::Statement>) -> Spanned<Statement> {
                         },
                         cond.1.clone(),
                     ),
-                    then: Box::new((Statement::Break, cond.1.clone())),
+                    then: Box::new((Statement::Break, cond.1)),
                     else_: Some(Box::new(body)),
                 };
 
@@ -126,10 +124,9 @@ fn lower_expr(expr: &Spanned<ast::Expr>) -> Spanned<Expr> {
             ast::Expr::Error => Expr::Error,
             ast::Expr::Literal(l) => Expr::Literal(lower_literal(l)),
             ast::Expr::Var(name) => Expr::Var(lower_ident(name)),
-            ast::Expr::List(exprs) => Expr::List((
-                exprs.0.iter().map(|expr| lower_expr(expr)).collect(),
-                exprs.1.clone(),
-            )),
+            ast::Expr::List(exprs) => {
+                Expr::List((exprs.0.iter().map(lower_expr).collect(), exprs.1.clone()))
+            }
             ast::Expr::Binary { lhs, op, rhs } => Expr::Binary {
                 lhs: Box::new(lower_expr(lhs)),
                 op: lower_binary_op(op),
@@ -181,10 +178,9 @@ fn lower_postfix_op(op: &Spanned<ast::PostfixOp>) -> Spanned<PostfixOp> {
     (
         match &op.0 {
             ast::PostfixOp::Error => PostfixOp::Error,
-            ast::PostfixOp::Call(exprs) => PostfixOp::Call((
-                exprs.0.iter().map(|expr| lower_expr(expr)).collect(),
-                exprs.1.clone(),
-            )),
+            ast::PostfixOp::Call(exprs) => {
+                PostfixOp::Call((exprs.0.iter().map(lower_expr).collect(), exprs.1.clone()))
+            }
             ast::PostfixOp::Index(expr) => {
                 let expr = Box::new(lower_expr(expr));
                 PostfixOp::Index(expr)

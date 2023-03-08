@@ -81,7 +81,7 @@ fn statement_parser() -> impl ChumskyParser<Token, Spanned<Statement>, Error = S
         let return_stmt = just(Token::Keyword(Keyword::Return))
             .ignore_then(expr_parser().or_not())
             .then_ignore(just(Token::Control(Control::Semicolon)))
-            .map(|expr| Statement::Return(expr))
+            .map(Statement::Return)
             .map_with_span(|stmt, span| (stmt, span))
             .boxed();
 
@@ -267,10 +267,10 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             ))
             .boxed();
 
-        let op = choice((call_args, index)).boxed();
+        let postfix_op = choice((call_args, index)).boxed();
 
         let postfix = atom
-            .then(op.repeated())
+            .then(postfix_op.repeated())
             .foldl(|expr, op| {
                 let span = expr.1.start..op.1.end;
 
@@ -284,14 +284,14 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             })
             .boxed();
 
-        let op = choice((
+        let prefix_op = choice((
             just(Token::Operator(Operator::Plus)).to(PrefixOp::Pos),
             just(Token::Operator(Operator::Minus)).to(PrefixOp::Neg),
         ))
         .map_with_span(|op, span| (op, span))
         .boxed();
 
-        let prefix = op
+        let prefix = prefix_op
             .repeated()
             .then(postfix)
             .foldr(|op, a| {
@@ -307,7 +307,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             })
             .boxed();
 
-        let op = choice((
+        let factor_op = choice((
             just(Token::Operator(Operator::Star)).to(BinaryOp::Mul),
             just(Token::Operator(Operator::Slash)).to(BinaryOp::Div),
         ))
@@ -316,7 +316,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
 
         let product = prefix
             .clone()
-            .then(op.then(prefix).repeated())
+            .then(factor_op.then(prefix).repeated())
             .foldl(|a, (op, b)| {
                 let span = a.1.start..b.1.end;
 
@@ -331,7 +331,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             })
             .boxed();
 
-        let op = choice((
+        let sum_op = choice((
             just(Token::Operator(Operator::Plus)).to(BinaryOp::Add),
             just(Token::Operator(Operator::Minus)).to(BinaryOp::Sub),
         ))
@@ -340,7 +340,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
 
         let sum = product
             .clone()
-            .then(op.then(product).repeated())
+            .then(sum_op.then(product).repeated())
             .foldl(|a, (op, b)| {
                 let span = a.1.start..b.1.end;
 
@@ -355,7 +355,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             })
             .boxed();
 
-        let op = choice((
+        let relational_op = choice((
             just(Token::Operator(Operator::Lt)).to(BinaryOp::Lt),
             just(Token::Operator(Operator::Lte)).to(BinaryOp::Lte),
             just(Token::Operator(Operator::Gt)).to(BinaryOp::Gt),
@@ -366,7 +366,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
 
         let relational = sum
             .clone()
-            .then(op.then(sum).repeated())
+            .then(relational_op.then(sum).repeated())
             .foldl(|a, (op, b)| {
                 let span = a.1.start..b.1.end;
 
@@ -381,7 +381,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             })
             .boxed();
 
-        let op = choice((
+        let equality_op = choice((
             just(Token::Operator(Operator::Eq)).to(BinaryOp::Eq),
             just(Token::Operator(Operator::Neq)).to(BinaryOp::Neq),
         ))
@@ -390,7 +390,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
 
         let equality = relational
             .clone()
-            .then(op.then(relational).repeated())
+            .then(equality_op.then(relational).repeated())
             .foldl(|a, (op, b)| {
                 let span = a.1.start..b.1.end;
 
@@ -405,13 +405,13 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             })
             .boxed();
 
-        let op = choice((just(Token::Operator(Operator::Range)).to(BinaryOp::Range),))
+        let range_op = choice((just(Token::Operator(Operator::Range)).to(BinaryOp::Range),))
             .map_with_span(|op, span| (op, span))
             .boxed();
 
         let range = equality
             .clone()
-            .then(op.then(equality).repeated())
+            .then(range_op.then(equality).repeated())
             .foldl(|a, (op, b)| {
                 let span = a.1.start..b.1.end;
 

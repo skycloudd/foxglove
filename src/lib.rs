@@ -8,7 +8,7 @@
 //! }
 //! ```
 
-use crate::error::ErrorReport;
+use crate::error::Report as ErrorReport;
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::Parser as _;
 use std::path::PathBuf;
@@ -47,11 +47,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let hir = if parse_errs.is_empty() {
-        if let Some(ast) = ast {
-            Some(hir::lower(&ast))
-        } else {
-            None
-        }
+        ast.map(|ast| hir::lower(&ast))
     } else {
         None
     };
@@ -102,7 +98,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     Err("compilation failed".into())
 }
 
-pub type Span = std::ops::Range<usize>;
+pub type Span = core::ops::Range<usize>;
 
 pub type Spanned<T> = (T, Span);
 
@@ -118,6 +114,7 @@ pub struct Config {
 
 impl Config {
     /// Creates a new `Config` from a filename.
+    #[must_use]
     pub fn new(filename: PathBuf, debug_tokens: bool, debug_ast: bool, debug_hir: bool) -> Self {
         Self {
             filename,

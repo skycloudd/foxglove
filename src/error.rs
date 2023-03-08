@@ -4,18 +4,18 @@ use chumsky::error::SimpleReason;
 use chumsky::prelude::Simple;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ErrorReport {
+pub struct Report {
     msg: String,
-    code: ErrorCode,
+    code: Code,
     errors: Vec<ActualError>,
     help_message: Option<String>,
     note: Option<String>,
 }
 
-impl ErrorReport {
+impl Report {
     fn new(
         msg: String,
-        code: ErrorCode,
+        code: Code,
         errors: Vec<ActualError>,
         help_message: Option<String>,
         note: Option<String>,
@@ -100,7 +100,7 @@ impl ErrorReport {
         &self.msg
     }
 
-    pub fn code(&self) -> &ErrorCode {
+    pub fn code(&self) -> &Code {
         &self.code
     }
 
@@ -125,19 +125,19 @@ impl ErrorReport {
     }
 }
 
-impl From<Simple<String, Span>> for ErrorReport {
+impl From<Simple<String, Span>> for Report {
     fn from(e: Simple<String, Span>) -> Self {
         match e.reason() {
             SimpleReason::Custom(msg) => Self::custom(e.span(), msg),
             SimpleReason::Unexpected => Self::unexpected(
                 e.span(),
-                e.found().map(|x| x.as_str()),
+                e.found().map(String::as_str),
                 e.expected()
-                    .map(|e| e.as_ref().map(|e| e.as_str()))
+                    .map(|e| e.as_ref().map(String::as_str))
                     .collect(),
             ),
             SimpleReason::Unclosed { span, delimiter } => {
-                Self::unclosed(span.clone(), delimiter, e.found().map(|x| x.as_str()))
+                Self::unclosed(span.clone(), delimiter, e.found().map(String::as_str))
             }
         }
     }
@@ -170,11 +170,11 @@ enum ErrorKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ErrorCode(pub String);
+pub struct Code(pub String);
 
-impl From<ErrorKind> for ErrorCode {
+impl From<ErrorKind> for Code {
     fn from(kind: ErrorKind) -> Self {
-        ErrorCode(format!(
+        Code(format!(
             "E{:04}",
             match kind {
                 ErrorKind::Custom => 1,
