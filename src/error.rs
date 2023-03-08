@@ -31,9 +31,9 @@ impl Report {
 
     fn custom(span: Span, msg: &str) -> Self {
         Self::new(
-            msg.to_string(),
+            msg.to_owned(),
             ErrorKind::Custom.into(),
-            vec![ActualError::new(span, msg.to_string())],
+            vec![ActualError::new(span, msg.to_owned())],
             None,
             None,
         )
@@ -49,7 +49,7 @@ impl Report {
                     "Unexpected end of input"
                 },
                 if expected.is_empty() {
-                    "something else".to_string()
+                    "something else".to_owned()
                 } else {
                     expected
                         .iter()
