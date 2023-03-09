@@ -91,7 +91,6 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char, Sp
         .padded()
         .repeated()
         .then_ignore(end())
-        .recover_with(skip_then_retry_until([]).consume_end())
         .boxed()
 }
 
