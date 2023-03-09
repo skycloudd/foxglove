@@ -108,7 +108,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             report
                 .finish()
                 .eprint(Source::from(&input))
-                .unwrap_or(eprintln!("{}", "failed to print error".fg(Color::Yellow)));
+                .unwrap_or_else(|e| eprintln!("{}", e.fg(Color::Yellow)));
         });
 
     Err("compilation failed".into())
