@@ -94,7 +94,7 @@ fn compile(input: &str, config: CompileConfig) -> Result<(), Box<dyn std::error:
     // lower the AST into HIR
     // removes things like for and while loops
     let hir = if parse_errs.is_empty() {
-        ast.map(|ast| lower::lower(&ast))
+        ast.map(lower::lower)
     } else {
         None
     };
@@ -108,7 +108,7 @@ fn compile(input: &str, config: CompileConfig) -> Result<(), Box<dyn std::error:
     // typecheck the HIR which converts it to THIR (typed HIR)
     // which is just HIR with type fields added
     let (typed_hir, typecheck_errs) = if let Some(hir) = hir {
-        match typecheck::typecheck(&hir) {
+        match typecheck::typecheck(hir) {
             Ok(typed_hir) => (Some(typed_hir), Vec::new()),
             Err(e) => (None, vec![e]),
         }
