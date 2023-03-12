@@ -1,4 +1,4 @@
-fn sort |a: [int], n: int|> {
+fn sort |a: [int], n: int|>
     for i in 1..n {
         for j in 1..n {
             if a[i] < a[j] {
@@ -9,7 +9,6 @@ fn sort |a: [int], n: int|> {
             }
         }
     }
-}
 
 fn main ||> int {
     var a = [5, 3, 9, 1, 2, 4, 6, 10, 7, 8];

@@ -45,7 +45,9 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if config.debug_ast {
-        dbg!(&ast);
+        if let Some(ast) = &ast {
+            eprintln!("ast: {}", ast.0.to_pretty(80)?);
+        }
     }
 
     let hir = if parse_errs.is_empty() {

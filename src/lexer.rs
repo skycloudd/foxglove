@@ -5,7 +5,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char, Sp
     let int = text::int(10)
         .validate(|s: String, span, emit| {
             if s.parse::<i64>().is_err() {
-                emit(Simple::custom(span, "integer literal doesnt fit in i64"));
+                emit(Simple::custom(span, "integer literal doesnt fit in int"));
             };
 
             s
@@ -18,7 +18,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char, Sp
         .collect::<String>()
         .validate(|s, span, emit| {
             if s.parse::<f64>().is_err() {
-                emit(Simple::custom(span, "float literal doesnt fit in f64"));
+                emit(Simple::custom(span, "float literal doesnt fit in float"));
             };
 
             s
@@ -54,7 +54,6 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char, Sp
         just(">=").to(Token::Operator(Operator::Gte)),
         just("==").to(Token::Operator(Operator::Eq)),
         just("!=").to(Token::Operator(Operator::Neq)),
-        just("..").to(Token::Operator(Operator::Range)),
         just("+").to(Token::Operator(Operator::Plus)),
         just("-").to(Token::Operator(Operator::Minus)),
         just("*").to(Token::Operator(Operator::Star)),
@@ -78,6 +77,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char, Sp
         just(";").to(Token::Control(Control::Semicolon)),
         just("|").to(Token::Control(Control::Pipe)),
         just(":").to(Token::Control(Control::Colon)),
+        just("..").to(Token::Control(Control::DotDot)),
     ))
     .boxed();
 
@@ -156,7 +156,6 @@ pub enum Operator {
     Minus,
     Star,
     Slash,
-    Range,
     Lt,
     Gt,
     Lte,
@@ -172,7 +171,6 @@ impl core::fmt::Display for Operator {
             Operator::Minus => write!(f, "-"),
             Operator::Star => write!(f, "*"),
             Operator::Slash => write!(f, "/"),
-            Operator::Range => write!(f, ".."),
             Operator::Lt => write!(f, "<"),
             Operator::Gt => write!(f, ">"),
             Operator::Lte => write!(f, "<="),
@@ -198,6 +196,7 @@ pub enum Control {
     PipeArrow,
     Colon,
     Unit,
+    DotDot,
 }
 
 impl core::fmt::Display for Control {
@@ -216,6 +215,7 @@ impl core::fmt::Display for Control {
             Control::PipeArrow => write!(f, "|>"),
             Control::Colon => write!(f, ":"),
             Control::Unit => write!(f, "()"),
+            Control::DotDot => write!(f, ".."),
         }
     }
 }
@@ -278,7 +278,7 @@ mod test {
 
     lex_test!(lex_weird, "((((((a + b) * c) / d) - e) + f) * g)");
 
-    lex_test!(lex_operators, "+ - * / .. == != < > <= >=");
+    lex_test!(lex_operators, "+ - * / == != < > <= >=");
 
     lex_test!(lex_delimiters, "( ) [ ] { } , ;");
 
@@ -292,4 +292,6 @@ mod test {
     lex_test!(lex_colon, ":");
 
     lex_test!(lex_unit, "()");
+
+    lex_test!(lex_dot_dot, "..");
 }

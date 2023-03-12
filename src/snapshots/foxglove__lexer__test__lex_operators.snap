@@ -1,6 +1,6 @@
 ---
 source: src/lexer.rs
-description: + - * / .. == != < > <= >=
+description: + - * / == != < > <= >=
 expression: tokens
 ---
 Some(
@@ -31,45 +31,39 @@ Some(
         ),
         (
             Operator(
-                Range,
+                Eq,
             ),
             8..10,
         ),
         (
             Operator(
-                Eq,
+                Neq,
             ),
             11..13,
         ),
         (
             Operator(
-                Neq,
-            ),
-            14..16,
-        ),
-        (
-            Operator(
                 Lt,
             ),
-            17..18,
+            14..15,
         ),
         (
             Operator(
                 Gt,
             ),
-            19..20,
+            16..17,
         ),
         (
             Operator(
                 Lte,
             ),
-            21..23,
+            18..20,
         ),
         (
             Operator(
                 Gte,
             ),
-            24..26,
+            21..23,
         ),
     ],
 )

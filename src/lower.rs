@@ -115,13 +115,76 @@ fn lower_statement(stmt: &Spanned<ast::Statement>) -> Spanned<Statement> {
             }
             ast::Statement::For {
                 ref var,
-                ref in_,
+                ref start,
+                ref end,
                 ref body,
-            } => Statement::For {
-                var: lower_ident(var),
-                in_: lower_expr(in_),
-                body: Box::new(lower_statement(body)),
-            },
+            } => {
+                let var = lower_ident(var);
+                let start = lower_expr(start);
+                let end = lower_expr(end);
+                let body = lower_statement(body);
+
+                let loop_body = Statement::IfElse {
+                    cond: (
+                        Expr::Binary {
+                            lhs: Box::new((
+                                Expr::Var((var.clone().0, var.1.clone())),
+                                var.1.clone(),
+                            )),
+                            op: (BinaryOp::Lt, end.1.clone()),
+                            rhs: Box::new(end.clone()),
+                        },
+                        stmt.1.clone(),
+                    ),
+                    then: Box::new((
+                        Statement::Block((
+                            vec![
+                                body.clone(),
+                                (
+                                    Statement::Assign(
+                                        (
+                                            AssignmentTarget::Var((var.clone().0, var.1.clone())),
+                                            var.1.clone(),
+                                        ),
+                                        (
+                                            Expr::Binary {
+                                                lhs: Box::new((
+                                                    Expr::Var((var.clone().0, var.1.clone())),
+                                                    var.1.clone(),
+                                                )),
+                                                op: (BinaryOp::Add, stmt.1.clone()),
+                                                rhs: Box::new((
+                                                    Expr::Literal((
+                                                        Literal::Int(1),
+                                                        stmt.1.clone(),
+                                                    )),
+                                                    stmt.1.clone(),
+                                                )),
+                                            },
+                                            stmt.1.clone(),
+                                        ),
+                                    ),
+                                    stmt.1.clone(),
+                                ),
+                            ],
+                            stmt.1.clone(),
+                        )),
+                        stmt.1.clone(),
+                    )),
+                    else_: Some(Box::new((Statement::Break, stmt.1.clone()))),
+                };
+
+                Statement::Block((
+                    vec![
+                        (Statement::VarDecl(var.clone(), None, start), var.1),
+                        (
+                            Statement::Loop(Box::new((loop_body, body.1.clone()))),
+                            body.1.clone(),
+                        ),
+                    ],
+                    stmt.1.clone(),
+                ))
+            }
             ast::Statement::Break => Statement::Break,
             ast::Statement::Continue => Statement::Continue,
             ast::Statement::Loop(ref stmt) => Statement::Loop(Box::new(lower_statement(stmt))),
@@ -133,7 +196,7 @@ fn lower_statement(stmt: &Spanned<ast::Statement>) -> Spanned<Statement> {
 fn lower_expr(expr: &Spanned<ast::Expr>) -> Spanned<Expr> {
     (
         match expr.0 {
-            ast::Expr::Error => Expr::Error,
+            ast::Expr::Error => unreachable!(),
             ast::Expr::Literal(ref l) => Expr::Literal(lower_literal(l)),
             ast::Expr::Var(ref name) => Expr::Var(lower_ident(name)),
             ast::Expr::List(ref exprs) => {
@@ -168,7 +231,6 @@ fn lower_binary_op(op: &Spanned<ast::BinaryOp>) -> Spanned<BinaryOp> {
             ast::BinaryOp::Sub => BinaryOp::Sub,
             ast::BinaryOp::Mul => BinaryOp::Mul,
             ast::BinaryOp::Div => BinaryOp::Div,
-            ast::BinaryOp::Range => BinaryOp::Range,
             ast::BinaryOp::Eq => BinaryOp::Eq,
             ast::BinaryOp::Neq => BinaryOp::Neq,
             ast::BinaryOp::Lt => BinaryOp::Lt,
@@ -193,7 +255,7 @@ fn lower_prefix_op(op: &Spanned<ast::PrefixOp>) -> Spanned<PrefixOp> {
 fn lower_postfix_op(op: &Spanned<ast::PostfixOp>) -> Spanned<PostfixOp> {
     (
         match op.0 {
-            ast::PostfixOp::Error => PostfixOp::Error,
+            ast::PostfixOp::Error => unreachable!(),
             ast::PostfixOp::Call(ref exprs) => {
                 PostfixOp::Call((exprs.0.iter().map(lower_expr).collect(), exprs.1.clone()))
             }

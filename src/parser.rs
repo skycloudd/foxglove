@@ -109,8 +109,15 @@ fn statement_parser() -> impl ChumskyParser<Token, Spanned<Statement>, Error = S
             .ignore_then(ident_parser())
             .then_ignore(just(Token::Keyword(Keyword::In)))
             .then(expr_parser())
+            .then_ignore(just(Token::Control(Control::DotDot)))
+            .then(expr_parser())
             .then(stmt.clone().map(Box::new))
-            .map(|((var, in_), body)| Statement::For { var, in_, body })
+            .map(|(((var, start), end), body)| Statement::For {
+                var,
+                start,
+                end,
+                body,
+            })
             .map_with_span(|stmt, span| (stmt, span))
             .boxed();
 
@@ -405,28 +412,7 @@ fn expr_parser() -> impl ChumskyParser<Token, Spanned<Expr>, Error = Simple<Toke
             })
             .boxed();
 
-        let range_op = choice((just(Token::Operator(Operator::Range)).to(BinaryOp::Range),))
-            .map_with_span(|op, span| (op, span))
-            .boxed();
-
-        let range = equality
-            .clone()
-            .then(range_op.then(equality).repeated())
-            .foldl(|a, (op, b)| {
-                let span = a.1.start..b.1.end;
-
-                (
-                    Expr::Binary {
-                        lhs: Box::new(a),
-                        op,
-                        rhs: Box::new(b),
-                    },
-                    span,
-                )
-            })
-            .boxed();
-
-        range
+        equality
     })
 }
 
@@ -490,8 +476,8 @@ fn type_parser() -> impl ChumskyParser<Token, Spanned<Type>, Error = Simple<Toke
 
         let other = ident_parser()
             .map(|name| match name.0.as_str() {
-                "i32" => Type::Int,
-                "f32" => Type::Float,
+                "int" => Type::Int,
+                "float" => Type::Float,
                 "bool" => Type::Bool,
                 _ => Type::Ident(name),
             })

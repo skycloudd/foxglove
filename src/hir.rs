@@ -38,11 +38,6 @@ pub enum Statement {
         then: Box<Spanned<Self>>,
         else_: Option<Box<Spanned<Self>>>,
     },
-    For {
-        var: Spanned<Ident>,
-        in_: Spanned<Expr>,
-        body: Box<Spanned<Self>>,
-    },
     Break,
     Continue,
     Loop(Box<Spanned<Self>>),
@@ -50,7 +45,6 @@ pub enum Statement {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Error,
     Literal(Spanned<Literal>),
     Var(Spanned<Ident>),
     List(Spanned<Vec<Spanned<Self>>>),
@@ -110,7 +104,6 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
-    Range,
     Eq,
     Neq,
     Lt,
@@ -127,7 +120,6 @@ pub enum PrefixOp {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PostfixOp {
-    Error,
     Call(Spanned<Vec<Spanned<Expr>>>),
     Index(Box<Spanned<Expr>>),
 }

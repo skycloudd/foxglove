@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use crate::error::Report;
 use crate::hir::{self, Hir};
 use crate::typed_hir::{
-    Expr, ExprKind, FunctionSignature, Item, Literal, Param, Statement, Type, TypedHir,
+    AssignmentTarget, AssignmentTargetKind, BinaryOp, Expr, ExprKind, FunctionSignature, Ident,
+    Item, Literal, Param, PostfixOp, PrefixOp, Statement, Type, TypedHir,
 };
 use crate::Spanned;
 
@@ -12,8 +13,10 @@ pub fn typecheck(hir: &Spanned<Hir>) -> Result<TypedHir, Report> {
 
     let mut items = vec![];
 
+    let mut bindings = HashMap::new();
+
     for item in &hir.0.items.0 {
-        items.push(tc_item(&mut engine, item)?);
+        items.push(tc_item(&mut engine, &mut bindings, item)?);
     }
 
     let thir = TypedHir {
@@ -23,13 +26,42 @@ pub fn typecheck(hir: &Spanned<Hir>) -> Result<TypedHir, Report> {
     Ok(thir)
 }
 
-fn tc_item(engine: &mut Engine, item: &Spanned<hir::Item>) -> Result<Spanned<Item>, Report> {
+fn tc_item(
+    engine: &mut Engine,
+    bindings: &mut HashMap<Ident, TypeId>,
+    item: &Spanned<hir::Item>,
+) -> Result<Spanned<Item>, Report> {
     Ok((
         match item.0 {
-            hir::Item::Fn { ref sig, ref body } => Item::Fn {
-                sig: tc_function_signature(sig)?,
-                body: tc_statement(engine, body)?,
-            },
+            hir::Item::Fn { ref sig, ref body } => {
+                let sig = tc_function_signature(sig)?;
+
+                let mut args = vec![];
+
+                for param in &sig.0.params.0 {
+                    let arg_ty = engine.type_to_typeinfo(param.0.ty.clone())?;
+
+                    bindings.insert(param.0.name.0.clone(), engine.insert(arg_ty.clone()));
+                    args.push(arg_ty);
+                }
+
+                let ret = engine.type_to_typeinfo(sig.0.ret_ty.clone())?;
+
+                bindings.insert(
+                    sig.0.name.0.clone(),
+                    engine.insert((
+                        TypeInfo::Function {
+                            args,
+                            ret: Box::new(ret),
+                        },
+                        sig.1.clone(),
+                    )),
+                );
+
+                let body = tc_statement(engine, bindings, &sig, body)?;
+
+                Item::Fn { sig, body }
+            }
         },
         item.1.clone(),
     ))
@@ -80,6 +112,8 @@ fn tc_type(ty: &Spanned<hir::Type>) -> Result<Spanned<Type>, Report> {
 
 fn tc_statement(
     engine: &mut Engine,
+    bindings: &mut HashMap<Ident, TypeId>,
+    current_fn: &Spanned<FunctionSignature>,
     stmt: &Spanned<hir::Statement>,
 ) -> Result<Spanned<Statement>, Report> {
     Ok((
@@ -88,63 +122,355 @@ fn tc_statement(
                 let mut body = vec![];
 
                 for stmt in &stmts.0 {
-                    body.push(tc_statement(engine, stmt)?);
+                    body.push(tc_statement(engine, bindings, current_fn, stmt)?);
                 }
 
                 Statement::Block((body, stmts.1.clone()))
             }
-            hir::Statement::Expr(ref expr) => Statement::Expr(tc_expr(engine, expr)?),
+            hir::Statement::Expr(ref expr) => Statement::Expr(tc_expr(engine, bindings, expr)?),
             hir::Statement::VarDecl(ref name, ref ty, ref expr) => {
                 let ty_ty = match ty {
-                    Some(ty) => engine.convert_to_typeinfo(tc_type(ty)?),
+                    Some(ty) => engine.type_to_typeinfo(tc_type(ty)?)?,
                     None => (TypeInfo::Unknown, stmt.1.clone()),
                 };
-                let expr_ty = tc_expr(engine, expr)?.0.ty;
-                let expr_ty = engine.convert_to_typeinfo((expr_ty, expr.1.clone()));
+                let ty_ty = engine.insert(ty_ty);
 
-                let ty_id = engine.insert(ty_ty);
-                let expr_id = engine.insert(expr_ty);
+                let expr = tc_expr(engine, bindings, expr)?;
+                let expr_ty = engine.type_to_typeinfo((expr.0.ty.clone(), expr.1.clone()))?;
+                let expr_ty = engine.insert(expr_ty);
 
-                engine.unify(ty_id, expr_id)?;
+                engine.unify(ty_ty, expr_ty)?;
 
-                Statement::VarDecl(
-                    name.clone(),
-                    engine.reconstruct(ty_id)?,
-                    tc_expr(engine, expr)?,
-                )
+                bindings.insert(name.0.clone(), ty_ty);
+
+                Statement::VarDecl(name.clone(), engine.reconstruct(ty_ty)?, expr)
             }
-            hir::Statement::Assign(ref target, ref expr) => todo!(),
-            hir::Statement::Return(ref expr) => todo!(),
+            hir::Statement::Assign(ref target, ref expr) => {
+                let target = tc_assignment_target(engine, bindings, target)?;
+                let expr = tc_expr(engine, bindings, expr)?;
+
+                let target_ty = engine.type_to_typeinfo((target.0.ty.clone(), target.1.clone()))?;
+                let target_ty = engine.insert(target_ty);
+
+                let expr_ty = engine.type_to_typeinfo((expr.0.ty.clone(), expr.1.clone()))?;
+                let expr_ty = engine.insert(expr_ty);
+
+                engine.unify(target_ty, expr_ty)?;
+
+                match target.0.kind {
+                    AssignmentTargetKind::Var(ref ident) => {
+                        bindings.insert(ident.0.clone(), target_ty);
+                    }
+                    AssignmentTargetKind::Index { .. } => {}
+                }
+
+                Statement::Assign(target, expr)
+            }
+            hir::Statement::Return(ref expr) => {
+                let expr = match expr {
+                    Some(expr) => Some(tc_expr(engine, bindings, expr)?),
+                    None => None,
+                };
+
+                let expr_ty = engine.type_to_typeinfo((
+                    match expr {
+                        Some(ref expr) => expr.0.ty.clone(),
+                        None => Type::Unit,
+                    },
+                    stmt.1.clone(),
+                ))?;
+                let expr_ty = engine.insert(expr_ty);
+
+                let function_return_ty = engine.type_to_typeinfo(current_fn.0.ret_ty.clone())?;
+                let function_return_ty = engine.insert(function_return_ty);
+
+                engine.unify(expr_ty, function_return_ty)?;
+
+                Statement::Return(expr)
+            }
             hir::Statement::IfElse {
                 ref cond,
                 ref then,
                 ref else_,
-            } => todo!(),
-            hir::Statement::For {
-                ref var,
-                ref in_,
-                ref body,
-            } => todo!(),
-            hir::Statement::Break => todo!(),
-            hir::Statement::Continue => todo!(),
-            hir::Statement::Loop(ref stmts) => todo!(),
+            } => {
+                let cond = tc_expr(engine, bindings, cond)?;
+                let then = tc_statement(engine, bindings, current_fn, then)?;
+                let else_ = match else_ {
+                    Some(else_) => {
+                        Some(Box::new(tc_statement(engine, bindings, current_fn, else_)?))
+                    }
+                    None => None,
+                };
+
+                let cond_ty = engine.type_to_typeinfo((cond.0.ty.clone(), cond.1.clone()))?;
+                let cond_ty = engine.insert(cond_ty);
+
+                let bool_ty = engine.insert((TypeInfo::Bool, stmt.1.clone()));
+
+                engine.unify(cond_ty, bool_ty)?;
+
+                Statement::IfElse {
+                    cond,
+                    then: Box::new(then),
+                    else_,
+                }
+            }
+            hir::Statement::Break => Statement::Break,
+            hir::Statement::Continue => Statement::Continue,
+            hir::Statement::Loop(ref stmts) => {
+                Statement::Loop(Box::new(tc_statement(engine, bindings, current_fn, stmts)?))
+            }
         },
         stmt.1.clone(),
     ))
 }
 
-fn tc_expr(engine: &mut Engine, expr: &Spanned<hir::Expr>) -> Result<Spanned<Expr>, Report> {
+fn tc_expr(
+    engine: &mut Engine,
+    bindings: &HashMap<Ident, TypeId>,
+    expr: &Spanned<hir::Expr>,
+) -> Result<Spanned<Expr>, Report> {
     Ok((
         match expr.0 {
-            hir::Expr::Error => unreachable!(),
             hir::Expr::Literal(ref lit) => Expr {
                 ty: tc_type(&(lit.0.ty(), lit.1.clone()))?.0,
                 kind: ExprKind::Literal(tc_literal(lit)?),
             },
-            _ => todo!(),
+            hir::Expr::Var(ref name) => {
+                let ty = match bindings.get(&name.0) {
+                    Some(id) => engine.reconstruct(*id)?.0,
+                    None => todo!("error cant find var"),
+                };
+
+                Expr {
+                    ty,
+                    kind: ExprKind::Var(name.clone()),
+                }
+            }
+            hir::Expr::List(ref list) => {
+                let mut elements = vec![];
+
+                for element in &list.0 {
+                    elements.push(tc_expr(engine, bindings, element)?);
+                }
+
+                let inner_ty = TypeInfo::Unknown;
+                let inner_ty = engine.insert((inner_ty, list.1.clone()));
+
+                for element in &elements {
+                    let element_ty =
+                        engine.type_to_typeinfo((element.0.ty.clone(), element.1.clone()))?;
+                    let element_ty = engine.insert(element_ty);
+
+                    engine.unify(inner_ty, element_ty)?;
+                }
+
+                Expr {
+                    ty: Type::List(Box::new(engine.reconstruct(inner_ty)?)),
+                    kind: ExprKind::List((elements, list.1.clone())),
+                }
+            }
+            hir::Expr::Binary {
+                ref lhs,
+                ref op,
+                ref rhs,
+            } => {
+                let lhs = tc_expr(engine, bindings, lhs)?;
+                let op = tc_binary_op(op)?;
+                let rhs = tc_expr(engine, bindings, rhs)?;
+
+                let lhs_ty = engine.type_to_typeinfo((lhs.0.ty.clone(), lhs.1.clone()))?;
+                let lhs_ty = engine.insert(lhs_ty);
+                let rhs_ty = engine.type_to_typeinfo((rhs.0.ty.clone(), rhs.1.clone()))?;
+                let rhs_ty = engine.insert(rhs_ty);
+
+                engine.unify(lhs_ty, rhs_ty)?;
+
+                let ty = match op.0 {
+                    BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
+                        engine.reconstruct(lhs_ty)?
+                    }
+                    BinaryOp::Eq
+                    | BinaryOp::Neq
+                    | BinaryOp::Lt
+                    | BinaryOp::Lte
+                    | BinaryOp::Gt
+                    | BinaryOp::Gte => {
+                        let bool_ty = engine.insert((TypeInfo::Bool, expr.1.clone()));
+                        engine.reconstruct(bool_ty)?
+                    }
+                };
+
+                Expr {
+                    ty: ty.0.clone(),
+                    kind: ExprKind::Binary {
+                        lhs: Box::new(lhs),
+                        op,
+                        rhs: Box::new(rhs),
+                    },
+                }
+            }
+            hir::Expr::Prefix { ref op, ref expr } => {
+                let op = tc_prefix_op(op)?;
+                let expr = tc_expr(engine, bindings, expr)?;
+
+                let expr_ty = engine.type_to_typeinfo((expr.0.ty.clone(), expr.1.clone()))?;
+                let expr_ty = engine.insert(expr_ty);
+
+                let ty = match op.0 {
+                    PrefixOp::Pos | PrefixOp::Neg => engine.reconstruct(expr_ty)?,
+                };
+
+                Expr {
+                    ty: ty.0.clone(),
+                    kind: ExprKind::Prefix {
+                        op,
+                        expr: Box::new(expr),
+                    },
+                }
+            }
+            hir::Expr::Postfix { ref expr, ref op } => {
+                let expr = tc_expr(engine, bindings, expr)?;
+                let op = tc_postfix_op(engine, bindings, op)?;
+
+                let ty = match op.0 {
+                    PostfixOp::Index(_) => match expr.0.ty {
+                        Type::List(ref ty) => ty.clone(),
+                        _ => todo!("error"),
+                    },
+                    PostfixOp::Call(ref args) => match expr.0.ty {
+                        Type::Function {
+                            ref params,
+                            ref ret_ty,
+                        } => {
+                            if params.len() != args.0.len() {
+                                todo!("error")
+                            } else {
+                                for (param, arg) in params.iter().zip(args.0.iter()) {
+                                    let param_ty = engine
+                                        .type_to_typeinfo((param.0.clone(), param.1.clone()))?;
+                                    let param_ty = engine.insert(param_ty);
+
+                                    let arg_ty = engine
+                                        .type_to_typeinfo((arg.0.ty.clone(), arg.1.clone()))?;
+                                    let arg_ty = engine.insert(arg_ty);
+
+                                    engine.unify(param_ty, arg_ty)?;
+                                }
+                            }
+
+                            ret_ty.clone()
+                        }
+                        _ => todo!("error"),
+                    },
+                };
+
+                Expr {
+                    ty: ty.0.clone(),
+                    kind: ExprKind::Postfix {
+                        expr: Box::new(expr),
+                        op,
+                    },
+                }
+            }
         },
         expr.1.clone(),
     ))
+}
+
+fn tc_binary_op(op: &Spanned<hir::BinaryOp>) -> Result<Spanned<BinaryOp>, Report> {
+    Ok((
+        match op.0 {
+            hir::BinaryOp::Add => BinaryOp::Add,
+            hir::BinaryOp::Sub => BinaryOp::Sub,
+            hir::BinaryOp::Mul => BinaryOp::Mul,
+            hir::BinaryOp::Div => BinaryOp::Div,
+            hir::BinaryOp::Eq => BinaryOp::Eq,
+            hir::BinaryOp::Neq => BinaryOp::Neq,
+            hir::BinaryOp::Lt => BinaryOp::Lt,
+            hir::BinaryOp::Gt => BinaryOp::Gt,
+            hir::BinaryOp::Lte => BinaryOp::Lte,
+            hir::BinaryOp::Gte => BinaryOp::Gte,
+        },
+        op.1.clone(),
+    ))
+}
+
+fn tc_prefix_op(op: &Spanned<hir::PrefixOp>) -> Result<Spanned<PrefixOp>, Report> {
+    Ok((
+        match op.0 {
+            hir::PrefixOp::Pos => PrefixOp::Pos,
+            hir::PrefixOp::Neg => PrefixOp::Neg,
+        },
+        op.1.clone(),
+    ))
+}
+
+fn tc_postfix_op(
+    engine: &mut Engine,
+    bindings: &HashMap<Ident, TypeId>,
+    op: &Spanned<hir::PostfixOp>,
+) -> Result<Spanned<PostfixOp>, Report> {
+    Ok((
+        match op.0 {
+            hir::PostfixOp::Call(ref args) => {
+                let args = (
+                    args.0
+                        .iter()
+                        .map(|arg| tc_expr(engine, bindings, arg))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    args.1.clone(),
+                );
+
+                PostfixOp::Call(args)
+            }
+            hir::PostfixOp::Index(ref index) => {
+                let index = tc_expr(engine, bindings, index)?;
+
+                let index_ty = engine.type_to_typeinfo((index.0.ty.clone(), index.1.clone()))?;
+                let index_ty = engine.insert(index_ty);
+                let int_ty = engine.insert((TypeInfo::Int, index.1.clone()));
+
+                engine.unify(index_ty, int_ty)?;
+
+                PostfixOp::Index(Box::new(index))
+            }
+        },
+        op.1.clone(),
+    ))
+}
+
+fn tc_assignment_target(
+    engine: &mut Engine,
+    bindings: &HashMap<Ident, TypeId>,
+    target: &Spanned<hir::AssignmentTarget>,
+) -> Result<Spanned<AssignmentTarget>, Report> {
+    let ty = match target.0 {
+        hir::AssignmentTarget::Var(ref ident) => match bindings.get(&ident.0) {
+            Some(ty) => engine.reconstruct(*ty)?,
+            None => todo!("error var not found"),
+        },
+        hir::AssignmentTarget::Index(ref target, ref index) => {
+            match tc_assignment_target(engine, bindings, target)?.0.ty {
+                Type::List(ty) => match tc_expr(engine, bindings, index)?.0.ty {
+                    Type::Int => *ty,
+                    _ => todo!("error index not int"),
+                },
+                _ => todo!("error target not list"),
+            }
+        }
+    }
+    .0;
+
+    let kind = match target.0 {
+        hir::AssignmentTarget::Var(ref ident) => AssignmentTargetKind::Var(ident.clone()),
+        hir::AssignmentTarget::Index(ref target, ref index) => AssignmentTargetKind::Index(
+            Box::new(tc_assignment_target(engine, bindings, target)?),
+            Box::new(tc_expr(engine, bindings, index)?),
+        ),
+    };
+
+    Ok((AssignmentTarget { ty, kind }, target.1.clone()))
 }
 
 fn tc_literal(lit: &Spanned<hir::Literal>) -> Result<Spanned<Literal>, Report> {
@@ -200,13 +526,18 @@ impl Engine {
 
             (TypeInfo::Bool, TypeInfo::Bool) => Ok(()),
 
-            (TypeInfo::List(a), TypeInfo::List(b)) => self.unify(a, b),
+            (TypeInfo::List(a), TypeInfo::List(b)) => {
+                let a = self.insert(*a);
+                let b = self.insert(*b);
+
+                self.unify(a, b)
+            }
 
             (_, _) => Err(Report::type_conflict(var_a, var_b)),
         }
     }
 
-    pub fn reconstruct(&self, id: TypeId) -> Result<Spanned<Type>, Report> {
+    pub fn reconstruct(&mut self, id: TypeId) -> Result<Spanned<Type>, Report> {
         let var = self.vars[&id].clone();
 
         match var.0 {
@@ -217,26 +548,51 @@ impl Engine {
             TypeInfo::Int => Ok((Type::Int, var.1)),
             TypeInfo::Float => Ok((Type::Float, var.1)),
             TypeInfo::Bool => Ok((Type::Bool, var.1)),
-            TypeInfo::List(ty) => Ok((Type::List(Box::new(self.reconstruct(ty)?)), var.1)),
+            TypeInfo::List(ty) => Ok((
+                Type::List(Box::new({
+                    let ty = self.insert(*ty);
+                    self.reconstruct(ty)?
+                })),
+                var.1,
+            )),
+            TypeInfo::Function { args, ret } => Ok((
+                Type::Function {
+                    params: args
+                        .into_iter()
+                        .map(|ty| {
+                            let ty = self.insert(ty);
+                            self.reconstruct(ty)
+                        })
+                        .collect::<Result<Vec<Spanned<Type>>, Report>>()?,
+                    ret_ty: Box::new({
+                        let ret = self.insert(*ret);
+                        self.reconstruct(ret)?
+                    }),
+                },
+                var.1,
+            )),
         }
     }
 
-    fn convert_to_typeinfo(&mut self, ty: Spanned<Type>) -> Spanned<TypeInfo> {
-        (
+    fn type_to_typeinfo(&mut self, ty: Spanned<Type>) -> Result<Spanned<TypeInfo>, Report> {
+        Ok((
             match ty.0 {
                 Type::Unit => TypeInfo::Unit,
                 Type::Ident(ident) => TypeInfo::Ident(ident),
                 Type::Int => TypeInfo::Int,
                 Type::Float => TypeInfo::Float,
                 Type::Bool => TypeInfo::Bool,
-                Type::List(ty) => {
-                    let ty = self.convert_to_typeinfo(*ty);
-
-                    TypeInfo::List(self.insert(ty))
-                }
+                Type::List(ty) => TypeInfo::List(Box::new(self.type_to_typeinfo(*ty)?)),
+                Type::Function { params, ret_ty } => TypeInfo::Function {
+                    args: params
+                        .into_iter()
+                        .map(|ty| self.type_to_typeinfo(ty))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    ret: Box::new(self.type_to_typeinfo(*ret_ty)?),
+                },
             },
-            ty.1,
-        )
+            ty.1.clone(),
+        ))
     }
 }
 
@@ -251,7 +607,11 @@ pub enum TypeInfo {
     Int,
     Float,
     Bool,
-    List(TypeId),
+    List(Box<Spanned<Self>>),
+    Function {
+        args: Vec<Spanned<Self>>,
+        ret: Box<Spanned<Self>>,
+    },
 }
 
 pub type TypeIdent = String;
@@ -266,7 +626,18 @@ impl std::fmt::Display for TypeInfo {
             TypeInfo::Int => write!(f, "int"),
             TypeInfo::Float => write!(f, "float"),
             TypeInfo::Bool => write!(f, "bool"),
-            TypeInfo::List(ty) => write!(f, "[{ty}]"),
+            TypeInfo::List(ty) => write!(f, "[{}]", ty.0),
+            TypeInfo::Function { args, ret } => {
+                write!(
+                    f,
+                    "fn |{}|> {}",
+                    args.into_iter()
+                        .map(|a| a.0.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    ret.0
+                )
+            }
         }
     }
 }

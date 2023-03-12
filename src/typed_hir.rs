@@ -38,11 +38,6 @@ pub enum Statement {
         then: Box<Spanned<Self>>,
         else_: Option<Box<Spanned<Self>>>,
     },
-    For {
-        var: Spanned<Ident>,
-        in_: Spanned<Expr>,
-        body: Box<Spanned<Self>>,
-    },
     Break,
     Continue,
     Loop(Box<Spanned<Self>>),
@@ -56,29 +51,34 @@ pub struct Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
-    Error,
     Literal(Spanned<Literal>),
     Var(Spanned<Ident>),
-    List(Spanned<Vec<Spanned<Self>>>),
+    List(Spanned<Vec<Spanned<Expr>>>),
     Binary {
-        lhs: Box<Spanned<Self>>,
+        lhs: Box<Spanned<Expr>>,
         op: Spanned<BinaryOp>,
-        rhs: Box<Spanned<Self>>,
+        rhs: Box<Spanned<Expr>>,
     },
     Prefix {
         op: Spanned<PrefixOp>,
-        expr: Box<Spanned<Self>>,
+        expr: Box<Spanned<Expr>>,
     },
     Postfix {
-        expr: Box<Spanned<Self>>,
+        expr: Box<Spanned<Expr>>,
         op: Spanned<PostfixOp>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum AssignmentTarget {
+pub struct AssignmentTarget {
+    pub kind: AssignmentTargetKind,
+    pub ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AssignmentTargetKind {
     Var(Spanned<Ident>),
-    Index(Box<Spanned<Self>>, Box<Spanned<Expr>>),
+    Index(Box<Spanned<AssignmentTarget>>, Box<Spanned<Expr>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -97,6 +97,10 @@ pub enum Type {
     Float,
     Bool,
     List(Box<Spanned<Self>>),
+    Function {
+        params: Vec<Spanned<Self>>,
+        ret_ty: Box<Spanned<Self>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,7 +109,6 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
-    Range,
     Eq,
     Neq,
     Lt,
@@ -122,7 +125,6 @@ pub enum PrefixOp {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PostfixOp {
-    Error,
     Call(Spanned<Vec<Spanned<Expr>>>),
     Index(Box<Spanned<Expr>>),
 }
