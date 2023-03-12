@@ -1,18 +1,25 @@
 ### foxglove
+
 Programming language made by [skycloudd](https://github.com/skycloudd/)
+
 ***
 
 ## Examples
-**Print math expression**
+
+**Calculate a math expression**
+
 ```dart
 fn main ||> int {
-    print(35+55);
+    var result = 34 + 35;
+
     return 0;
 }
 ```
+
 **Sort function**
+
 ```dart
-fn sort |a: [int], n: int|> {
+fn sort |a: [int], n: int|>
     for i in 1..n {
         for j in 1..n {
             if a[i] < a[j] {
@@ -23,13 +30,36 @@ fn sort |a: [int], n: int|> {
             }
         }
     }
-}
 
 fn main ||> int {
     var a = [5, 3, 9, 1, 2, 4, 6, 10, 7, 8];
     var n = 10;
 
     sort(a, n);
+
+    return 0;
+}
+```
+
+**Fibonacci sequence**
+
+```dart
+fn fib|n: int|> int {
+    if n == 0
+        return n;
+
+    else if n == 1
+        return n;
+    else
+        return fib(n - 1) + fib(n - 2);
+}
+
+fn main ||> int {
+    var n = 10;
+
+    for i in 0..10 {
+        fib(i);
+    }
 
     return 0;
 }
