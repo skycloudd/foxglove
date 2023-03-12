@@ -206,13 +206,10 @@ fn tc_statement(
                     None => None,
                 };
 
-                let expr_ty = type_to_typeinfo((
-                    match expr {
-                        Some(ref expr) => expr.0.ty.clone(),
-                        None => Type::Unit,
-                    },
-                    stmt.1.clone(),
-                ))?;
+                let expr_ty = type_to_typeinfo(match expr {
+                    Some(ref expr) => (expr.0.ty.clone(), expr.1.clone()),
+                    None => (Type::Unit, stmt.1.clone()),
+                })?;
                 let expr_ty = engine.insert(expr_ty);
 
                 let function_return_ty = type_to_typeinfo(current_fn_ret.clone())?;
