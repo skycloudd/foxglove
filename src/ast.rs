@@ -273,14 +273,14 @@ mod pretty_printing {
                     .append(cond.0.to_doc())
                     .append(RcDoc::line())
                     .append(then.0.to_doc())
+                    .nest(4)
+                    .append(RcDoc::line())
                     .append(match else_ {
-                        Some(else_) => RcDoc::space()
-                            .append(
-                                RcDoc::text("else")
-                                    .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone()),
-                            )
-                            .append(RcDoc::space())
-                            .append(else_.0.to_doc()),
+                        Some(else_) => RcDoc::text("else")
+                            .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
+                            .append(RcDoc::line())
+                            .append(else_.0.to_doc())
+                            .nest(4),
                         None => RcDoc::nil(),
                     }),
                 super::Statement::While { cond, body } => RcDoc::text("while")
@@ -288,7 +288,8 @@ mod pretty_printing {
                     .append(RcDoc::space())
                     .append(cond.0.to_doc())
                     .append(RcDoc::line())
-                    .append(body.0.to_doc()),
+                    .append(body.0.to_doc())
+                    .nest(4),
                 super::Statement::For {
                     var,
                     start,
@@ -308,7 +309,8 @@ mod pretty_printing {
                     .append(RcDoc::text(".."))
                     .append(end.0.to_doc())
                     .append(RcDoc::line())
-                    .append(body.0.to_doc()),
+                    .append(body.0.to_doc())
+                    .nest(4),
                 super::Statement::Break => RcDoc::text("break")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
                     .append(RcDoc::text(";")),
@@ -319,7 +321,8 @@ mod pretty_printing {
                     .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
                     .append(RcDoc::space())
                     .append(RcDoc::line())
-                    .append(body.0.to_doc()),
+                    .append(body.0.to_doc())
+                    .nest(4),
             }
         }
     }
