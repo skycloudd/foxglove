@@ -9,7 +9,7 @@ fn main() {
     let config = args.into();
 
     match run(config) {
-        Ok(()) => {}
+        Ok(exit_code) => std::process::exit(exit_code),
         Err(e) => {
             eprintln!("{}: {}", "Error".fg(Color::Red), e);
             std::process::exit(1);
@@ -22,23 +22,29 @@ fn main() {
 #[command(arg_required_else_help(true))]
 /// Compiler for the foxglove programming language
 struct Args {
-    filename: PathBuf,
+    filenames: Vec<PathBuf>,
 
-    #[clap(short, long)]
-    tokens: bool,
+    #[clap(long = "debug-tokens")]
+    debug_tokens: bool,
 
-    #[clap(short, long)]
-    ast: bool,
+    #[clap(long = "debug-ast")]
+    debug_ast: bool,
 
-    #[clap(short = 'H', long)]
-    hir: bool,
+    #[clap(long = "debug-hir")]
+    debug_hir: bool,
 
-    #[clap(short = 'T', long)]
-    thir: bool,
+    #[clap(long = "debug-thir")]
+    debug_thir: bool,
 }
 
 impl From<Args> for Config {
     fn from(args: Args) -> Self {
-        Self::new(args.filename, args.tokens, args.ast, args.hir, args.thir)
+        Self::new(
+            args.filenames,
+            args.debug_tokens,
+            args.debug_ast,
+            args.debug_hir,
+            args.debug_thir,
+        )
     }
 }

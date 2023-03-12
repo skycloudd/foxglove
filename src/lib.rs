@@ -4,7 +4,7 @@
 //!
 //! ```fox
 //! fn main ||> {
-//!    print(34 + 35);
+//!    println(34 + 35);
 //! }
 //! ```
 
@@ -23,17 +23,58 @@ mod typecheck;
 mod typed_hir;
 
 /// The main entry point for the compiler.
-/// It goes through every stage sequentially
-/// If a stage fails, it should go straight to the error reporting stage
-pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
-    let input = std::fs::read_to_string(config.filename)?;
+/// It takes a `Config` and compiles every file in it.
+pub fn run(config: Config) -> Result<i32, Box<dyn std::error::Error>> {
+    let mut exit_code = 0;
 
-    let (tokens, lex_errs) = lexer::lexer().parse_recovery(input.as_str());
+    for filename in &config.filenames {
+        let input = match std::fs::read_to_string(filename) {
+            Ok(input) => input,
+            Err(e) => {
+                eprintln!(
+                    "{}: {}: {}",
+                    filename.display().fg(Color::White),
+                    "Error".fg(Color::Red),
+                    e
+                );
+
+                continue;
+            }
+        };
+
+        match compile(&input, config.clone().into()) {
+            Ok(()) => {}
+            Err(e) => {
+                // there was an error, so print it
+                eprintln!(
+                    "{}: {}: {}",
+                    filename.display().fg(Color::White),
+                    "Error".fg(Color::Red),
+                    e
+                );
+                exit_code = 1;
+
+                continue;
+            }
+        }
+    }
+
+    Ok(exit_code)
+}
+
+/// Compiles foxglove source code.
+/// It goes through every stage sequentially.
+/// If a stage fails, it should go straight to
+/// the error reporting stage instead of continuing
+fn compile(input: &str, config: CompileConfig) -> Result<(), Box<dyn std::error::Error>> {
+    // parse the input into tokens
+    let (tokens, lex_errs) = lexer::lexer().parse_recovery(input);
 
     if config.debug_tokens {
         dbg!(&tokens);
     }
 
+    // parse the tokens into an AST
     let (ast, parse_errs) = if lex_errs.is_empty() {
         if let Some(tokens) = tokens {
             parser::parse(tokens, input.chars().count())
@@ -50,6 +91,8 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // lower the AST into HIR
+    // removes things like for and while loops
     let hir = if parse_errs.is_empty() {
         ast.map(|ast| lower::lower(&ast))
     } else {
@@ -57,9 +100,13 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if config.debug_hir {
-        dbg!(&hir);
+        if let Some(hir) = &hir {
+            eprintln!("hir: {}", hir.0.to_pretty(80)?);
+        }
     }
 
+    // typecheck the HIR which converts it to THIR (typed HIR)
+    // which is just HIR with type fields added
     let (typed_hir, typecheck_errs) = if let Some(hir) = hir {
         match typecheck::typecheck(&hir) {
             Ok(typed_hir) => (Some(typed_hir), Vec::new()),
@@ -70,9 +117,13 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if config.debug_thir {
-        dbg!(&typed_hir);
+        if let Some(typed_hir) = &typed_hir {
+            eprintln!("thir: {}", typed_hir.0.to_pretty(80)?);
+        }
     }
 
+    // generate error reports
+    // this should only be reached if there are any errors
     Vec::new()
         .into_iter()
         .chain(
@@ -116,15 +167,16 @@ pub fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     Err("compilation failed".into())
 }
 
-pub type Span = core::ops::Range<usize>;
+type Span = core::ops::Range<usize>;
 
-pub type Spanned<T> = (T, Span);
+type Spanned<T> = (T, Span);
 
 /// The configuration for the compiler. It is used to pass
 /// information from the command line to the compiler.
 /// It contains the filename of the file to compile.
+#[derive(Debug, Clone)]
 pub struct Config {
-    filename: PathBuf,
+    filenames: Vec<PathBuf>,
     debug_tokens: bool,
     debug_ast: bool,
     debug_hir: bool,
@@ -135,18 +187,37 @@ impl Config {
     /// Creates a new `Config` from a filename.
     #[must_use]
     pub fn new(
-        filename: PathBuf,
+        filenames: Vec<PathBuf>,
         debug_tokens: bool,
         debug_ast: bool,
         debug_hir: bool,
         debug_thir: bool,
     ) -> Self {
         Self {
-            filename,
+            filenames,
             debug_tokens,
             debug_ast,
             debug_hir,
             debug_thir,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CompileConfig {
+    debug_tokens: bool,
+    debug_ast: bool,
+    debug_hir: bool,
+    debug_thir: bool,
+}
+
+impl From<Config> for CompileConfig {
+    fn from(config: Config) -> Self {
+        Self {
+            debug_tokens: config.debug_tokens,
+            debug_ast: config.debug_ast,
+            debug_hir: config.debug_hir,
+            debug_thir: config.debug_thir,
         }
     }
 }

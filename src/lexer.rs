@@ -78,6 +78,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char, Sp
         just("|").to(Token::Control(Control::Pipe)),
         just(":").to(Token::Control(Control::Colon)),
         just("..").to(Token::Control(Control::DotDot)),
+        just("@").to(Token::Control(Control::At)),
     ))
     .boxed();
 
@@ -197,6 +198,7 @@ pub enum Control {
     Colon,
     Unit,
     DotDot,
+    At, // @
 }
 
 impl core::fmt::Display for Control {
@@ -216,6 +218,7 @@ impl core::fmt::Display for Control {
             Control::Colon => write!(f, ":"),
             Control::Unit => write!(f, "()"),
             Control::DotDot => write!(f, ".."),
+            Control::At => write!(f, "@"),
         }
     }
 }

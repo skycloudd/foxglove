@@ -1,7 +1,7 @@
 use crate::ast::{self, Ast};
 use crate::hir::{
-    AssignmentTarget, BinaryOp, Expr, FunctionSignature, Hir, Ident, Item, Literal, Param,
-    PostfixOp, PrefixOp, Statement, Type,
+    AssignmentTarget, Attribute, BinaryOp, Expr, FunctionSignature, Hir, Ident, Item, Literal,
+    Param, PostfixOp, PrefixOp, Statement, Type,
 };
 use crate::Spanned;
 
@@ -26,12 +26,35 @@ pub fn lower(ast: &Spanned<Ast>) -> Spanned<Hir> {
 fn lower_item(item: &Spanned<ast::Item>) -> Spanned<Item> {
     (
         match item.0 {
-            ast::Item::Fn { ref sig, ref body } => Item::Fn {
+            ast::Item::Fn {
+                ref attrs,
+                ref sig,
+                ref body,
+            } => Item::Fn {
+                attrs: (
+                    attrs
+                        .0
+                        .clone()
+                        .into_iter()
+                        .map(|attr| lower_attribute(&attr))
+                        .collect(),
+                    attrs.1.clone(),
+                ),
                 sig: lower_function_signature(sig),
                 body: lower_statement(body),
             },
         },
         item.1.clone(),
+    )
+}
+
+fn lower_attribute(attr: &Spanned<ast::Attribute>) -> Spanned<Attribute> {
+    (
+        Attribute {
+            name: lower_ident(&attr.0.name),
+            value: lower_expr(&attr.0.value),
+        },
+        attr.1.clone(),
     )
 }
 

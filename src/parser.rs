@@ -1,6 +1,6 @@
 use crate::ast::{
-    AssignmentTarget, Ast, BinaryOp, Expr, FunctionSignature, Ident, Item, Literal, Param,
-    PostfixOp, PrefixOp, Statement, Type,
+    AssignmentTarget, Ast, Attribute, BinaryOp, Expr, FunctionSignature, Ident, Item, Literal,
+    Param, PostfixOp, PrefixOp, Statement, Type,
 };
 use crate::lexer::{Control, Keyword, Operator, Token};
 use crate::Spanned;
@@ -25,14 +25,33 @@ pub fn parser() -> impl ChumskyParser<Token, Spanned<Ast>, Error = Simple<Token>
 }
 
 fn item_parser() -> impl ChumskyParser<Token, Spanned<Item>, Error = Simple<Token>> {
-    let function = just(Token::Keyword(Keyword::Fn))
-        .ignore_then(function_signature_parser())
+    let function = attribute_parser()
+        .repeated()
+        .map_with_span(|attrs, span| (attrs, span))
+        .then_ignore(just(Token::Keyword(Keyword::Fn)))
+        .then(function_signature_parser())
         .then(statement_parser())
-        .map(|(sig, body)| Item::Fn { sig, body })
+        .map(|((attrs, sig), body)| Item::Fn { attrs, sig, body })
         .boxed();
 
     choice((function,))
         .map_with_span(|item, span| (item, span))
+        .boxed()
+}
+
+fn attribute_parser() -> impl ChumskyParser<Token, Spanned<Attribute>, Error = Simple<Token>> {
+    let inner = ident_parser()
+        .then_ignore(just(Token::Control(Control::Equals)))
+        .then(expr_parser())
+        .boxed();
+
+    just(Token::Control(Control::At))
+        .ignore_then(inner.delimited_by(
+            just(Token::Control(Control::OpenSquareBracket)),
+            just(Token::Control(Control::CloseSquareBracket)),
+        ))
+        .map(|(name, value)| Attribute { name, value })
+        .map_with_span(|attr, span| (attr, span))
         .boxed()
 }
 

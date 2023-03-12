@@ -8,9 +8,16 @@ pub struct Ast {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Fn {
+        attrs: Spanned<Vec<Spanned<Attribute>>>,
         sig: Spanned<FunctionSignature>,
         body: Spanned<Statement>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Attribute {
+    pub name: Spanned<Ident>,
+    pub value: Spanned<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -128,10 +135,11 @@ pub enum PostfixOp {
 pub type Ident = String;
 
 mod pretty_printing {
+    use super::*;
     use pretty::termcolor::{Ansi, Color, ColorSpec};
     use pretty::RcDoc;
 
-    impl super::Ast {
+    impl Ast {
         pub fn to_pretty(&self, width: usize) -> Result<String, Box<dyn std::error::Error>> {
             let mut w = Ansi::new(Vec::new());
 
@@ -152,21 +160,45 @@ mod pretty_printing {
         }
     }
 
-    impl super::Item {
+    impl Item {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::Item::Fn { sig, body } => RcDoc::text("fn")
-                    .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
-                    .append(RcDoc::space())
-                    .append(sig.0.to_doc())
-                    .append(RcDoc::line())
-                    .append(body.0.to_doc())
-                    .nest(4),
+                Item::Fn { attrs, sig, body } => {
+                    RcDoc::intersperse(attrs.0.iter().map(|attr| attr.0.to_doc()), RcDoc::line())
+                        .append(RcDoc::line())
+                        .append(
+                            RcDoc::text("fn")
+                                .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
+                                .append(RcDoc::space())
+                                .append(sig.0.to_doc())
+                                .append(RcDoc::line())
+                                .append(body.0.to_doc())
+                                .nest(4),
+                        )
+                }
             }
         }
     }
 
-    impl super::FunctionSignature {
+    impl Attribute {
+        pub fn to_doc(&self) -> RcDoc<ColorSpec> {
+            RcDoc::text("@")
+                .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
+                .append(
+                    RcDoc::text("[").annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone()),
+                )
+                .append(self.name.0.clone())
+                .append(RcDoc::space())
+                .append(RcDoc::text("="))
+                .append(RcDoc::space())
+                .append(self.value.0.to_doc())
+                .append(
+                    RcDoc::text("]").annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone()),
+                )
+        }
+    }
+
+    impl FunctionSignature {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             RcDoc::text(&self.name.0)
                 .append(RcDoc::space())
@@ -188,7 +220,7 @@ mod pretty_printing {
         }
     }
 
-    impl super::Param {
+    impl Param {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             RcDoc::text(&self.name.0)
                 .append(
@@ -199,15 +231,15 @@ mod pretty_printing {
         }
     }
 
-    impl super::Type {
+    impl Type {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::Type::Unit => RcDoc::text("()"),
-                super::Type::Ident(i) => RcDoc::text(&i.0),
-                super::Type::Int => RcDoc::text("int"),
-                super::Type::Float => RcDoc::text("float"),
-                super::Type::Bool => RcDoc::text("bool"),
-                super::Type::List(t) => RcDoc::text("[")
+                Type::Unit => RcDoc::text("()"),
+                Type::Ident(i) => RcDoc::text(&i.0),
+                Type::Int => RcDoc::text("int"),
+                Type::Float => RcDoc::text("float"),
+                Type::Bool => RcDoc::text("bool"),
+                Type::List(t) => RcDoc::text("[")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone())
                     .append(t.0.to_doc())
                     .append(
@@ -219,10 +251,10 @@ mod pretty_printing {
         }
     }
 
-    impl super::Statement {
+    impl Statement {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::Statement::Block(stmts) => RcDoc::text("{")
+                Statement::Block(stmts) => RcDoc::text("{")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone())
                     .append(RcDoc::line())
                     .append(RcDoc::intersperse(
@@ -235,9 +267,9 @@ mod pretty_printing {
                         RcDoc::text("}")
                             .annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone()),
                     ),
-                super::Statement::Expr(expr) => expr.0.to_doc().append(RcDoc::text(";")),
-                super::Statement::VarDecl(name, ty, expr) => RcDoc::text("var")
-                    .annotate(ColorSpec::new().set_fg(Some(Color::Blue)).clone())
+                Statement::Expr(expr) => expr.0.to_doc().append(RcDoc::text(";")),
+                Statement::VarDecl(name, ty, expr) => RcDoc::text("var")
+                    .annotate(ColorSpec::new().set_fg(Some(Color::Cyan)).clone())
                     .append(RcDoc::space())
                     .append(&name.0)
                     .append(match ty {
@@ -252,7 +284,7 @@ mod pretty_printing {
                     .append(RcDoc::space())
                     .append(expr.0.to_doc())
                     .append(RcDoc::text(";")),
-                super::Statement::Assign(target, expr) => target
+                Statement::Assign(target, expr) => target
                     .0
                     .to_doc()
                     .append(RcDoc::space())
@@ -260,14 +292,14 @@ mod pretty_printing {
                     .append(RcDoc::space())
                     .append(expr.0.to_doc())
                     .append(RcDoc::text(";")),
-                super::Statement::Return(expr) => RcDoc::text("return")
+                Statement::Return(expr) => RcDoc::text("return")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
                     .append(match expr {
                         Some(expr) => RcDoc::space().append(expr.0.to_doc()),
                         None => RcDoc::nil(),
                     })
                     .append(RcDoc::text(";")),
-                super::Statement::IfElse { cond, then, else_ } => RcDoc::text("if")
+                Statement::IfElse { cond, then, else_ } => RcDoc::text("if")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
                     .append(RcDoc::space())
                     .append(cond.0.to_doc())
@@ -283,14 +315,14 @@ mod pretty_printing {
                             .nest(4),
                         None => RcDoc::nil(),
                     }),
-                super::Statement::While { cond, body } => RcDoc::text("while")
+                Statement::While { cond, body } => RcDoc::text("while")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
                     .append(RcDoc::space())
                     .append(cond.0.to_doc())
                     .append(RcDoc::line())
                     .append(body.0.to_doc())
                     .nest(4),
-                super::Statement::For {
+                Statement::For {
                     var,
                     start,
                     end,
@@ -311,13 +343,13 @@ mod pretty_printing {
                     .append(RcDoc::line())
                     .append(body.0.to_doc())
                     .nest(4),
-                super::Statement::Break => RcDoc::text("break")
+                Statement::Break => RcDoc::text("break")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
                     .append(RcDoc::text(";")),
-                super::Statement::Continue => RcDoc::text("continue")
+                Statement::Continue => RcDoc::text("continue")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
                     .append(RcDoc::text(";")),
-                super::Statement::Loop(body) => RcDoc::text("loop")
+                Statement::Loop(body) => RcDoc::text("loop")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
                     .append(RcDoc::space())
                     .append(RcDoc::line())
@@ -327,16 +359,16 @@ mod pretty_printing {
         }
     }
 
-    impl super::Expr {
+    impl Expr {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::Expr::Error => RcDoc::text("Error"),
-                super::Expr::Literal(lit) => lit
+                Expr::Error => RcDoc::text("Error"),
+                Expr::Literal(lit) => lit
                     .0
                     .to_doc()
                     .annotate(ColorSpec::new().set_fg(Some(Color::Magenta)).clone()),
-                super::Expr::Var(name) => RcDoc::text(&name.0),
-                super::Expr::List(items) => RcDoc::text("[")
+                Expr::Var(name) => RcDoc::text(&name.0),
+                Expr::List(items) => RcDoc::text("[")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone())
                     .append(
                         RcDoc::intersperse(
@@ -349,15 +381,15 @@ mod pretty_printing {
                         RcDoc::text("]")
                             .annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone()),
                     ),
-                super::Expr::Binary { lhs, op, rhs } => lhs
+                Expr::Binary { lhs, op, rhs } => lhs
                     .0
                     .to_doc()
                     .append(RcDoc::space())
                     .append(op.0.to_doc())
                     .append(RcDoc::space())
                     .append(rhs.0.to_doc()),
-                super::Expr::Prefix { op, expr } => op.0.to_doc().append(expr.0.to_doc()),
-                super::Expr::Postfix { expr, op } => if let super::PostfixOp::Call(_) = op.0 {
+                Expr::Prefix { op, expr } => op.0.to_doc().append(expr.0.to_doc()),
+                Expr::Postfix { expr, op } => if let PostfixOp::Call(_) = op.0 {
                     expr.0
                         .to_doc()
                         .annotate(ColorSpec::new().set_fg(Some(Color::Green)).clone())
@@ -369,48 +401,48 @@ mod pretty_printing {
         }
     }
 
-    impl super::Literal {
+    impl Literal {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::Literal::Unit => RcDoc::text("()"),
-                super::Literal::Int(i) => RcDoc::as_string(i),
-                super::Literal::Float(f) => RcDoc::as_string(f),
-                super::Literal::Bool(b) => RcDoc::as_string(b),
+                Literal::Unit => RcDoc::text("()"),
+                Literal::Int(i) => RcDoc::as_string(i),
+                Literal::Float(f) => RcDoc::as_string(f),
+                Literal::Bool(b) => RcDoc::as_string(b),
             }
         }
     }
 
-    impl super::BinaryOp {
+    impl BinaryOp {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::BinaryOp::Add => RcDoc::text("+"),
-                super::BinaryOp::Sub => RcDoc::text("-"),
-                super::BinaryOp::Mul => RcDoc::text("*"),
-                super::BinaryOp::Div => RcDoc::text("/"),
-                super::BinaryOp::Eq => RcDoc::text("=="),
-                super::BinaryOp::Neq => RcDoc::text("!="),
-                super::BinaryOp::Lt => RcDoc::text("<"),
-                super::BinaryOp::Gt => RcDoc::text(">"),
-                super::BinaryOp::Lte => RcDoc::text("<="),
-                super::BinaryOp::Gte => RcDoc::text(">="),
+                BinaryOp::Add => RcDoc::text("+"),
+                BinaryOp::Sub => RcDoc::text("-"),
+                BinaryOp::Mul => RcDoc::text("*"),
+                BinaryOp::Div => RcDoc::text("/"),
+                BinaryOp::Eq => RcDoc::text("=="),
+                BinaryOp::Neq => RcDoc::text("!="),
+                BinaryOp::Lt => RcDoc::text("<"),
+                BinaryOp::Gt => RcDoc::text(">"),
+                BinaryOp::Lte => RcDoc::text("<="),
+                BinaryOp::Gte => RcDoc::text(">="),
             }
         }
     }
 
-    impl super::PrefixOp {
+    impl PrefixOp {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::PrefixOp::Pos => RcDoc::text("+"),
-                super::PrefixOp::Neg => RcDoc::text("-"),
+                PrefixOp::Pos => RcDoc::text("+"),
+                PrefixOp::Neg => RcDoc::text("-"),
             }
         }
     }
 
-    impl super::PostfixOp {
+    impl PostfixOp {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::PostfixOp::Error => RcDoc::text("Error"),
-                super::PostfixOp::Call(args) => RcDoc::text("(")
+                PostfixOp::Error => RcDoc::text("Error"),
+                PostfixOp::Call(args) => RcDoc::text("(")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone())
                     .append(
                         RcDoc::intersperse(
@@ -423,7 +455,7 @@ mod pretty_printing {
                         RcDoc::text(")")
                             .annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone()),
                     ),
-                super::PostfixOp::Index(index) => RcDoc::text("[")
+                PostfixOp::Index(index) => RcDoc::text("[")
                     .annotate(ColorSpec::new().set_fg(Some(Color::Yellow)).clone())
                     .append(index.0.to_doc())
                     .append(
@@ -434,11 +466,11 @@ mod pretty_printing {
         }
     }
 
-    impl super::AssignmentTarget {
+    impl AssignmentTarget {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                super::AssignmentTarget::Var(name) => RcDoc::text(&name.0),
-                super::AssignmentTarget::Index(target, index) => target
+                AssignmentTarget::Var(name) => RcDoc::text(&name.0),
+                AssignmentTarget::Index(target, index) => target
                     .0
                     .to_doc()
                     .append(

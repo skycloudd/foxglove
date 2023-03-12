@@ -1,14 +1,13 @@
-use std::collections::HashMap;
-
 use crate::error::Report;
 use crate::hir::{self, Hir};
 use crate::typed_hir::{
-    AssignmentTarget, AssignmentTargetKind, BinaryOp, Expr, ExprKind, FunctionSignature, Ident,
-    Item, Literal, Param, PostfixOp, PrefixOp, Statement, Type, TypedHir,
+    AssignmentTarget, AssignmentTargetKind, Attribute, BinaryOp, Expr, ExprKind, FunctionSignature,
+    Ident, Item, Literal, Param, PostfixOp, PrefixOp, Statement, Type, TypedHir,
 };
 use crate::Spanned;
+use std::collections::HashMap;
 
-pub fn typecheck(hir: &Spanned<Hir>) -> Result<TypedHir, Report> {
+pub fn typecheck(hir: &Spanned<Hir>) -> Result<Spanned<TypedHir>, Report> {
     let mut engine = Engine::default();
 
     let mut items = vec![];
@@ -19,9 +18,12 @@ pub fn typecheck(hir: &Spanned<Hir>) -> Result<TypedHir, Report> {
         items.push(tc_item(&mut engine, &mut bindings, item)?);
     }
 
-    let thir = TypedHir {
-        items: (items, hir.0.items.1.clone()),
-    };
+    let thir = (
+        TypedHir {
+            items: (items, hir.0.items.1.clone()),
+        },
+        hir.1.clone(),
+    );
 
     Ok(thir)
 }
@@ -33,38 +35,72 @@ fn tc_item(
 ) -> Result<Spanned<Item>, Report> {
     Ok((
         match item.0 {
-            hir::Item::Fn { ref sig, ref body } => {
+            hir::Item::Fn {
+                ref attrs,
+                ref sig,
+                ref body,
+            } => {
+                let attrs = tc_attributes(engine, bindings, attrs)?;
+
                 let sig = tc_function_signature(sig)?;
 
                 let mut args = vec![];
 
+                let ret = engine.type_to_typeinfo(sig.0.ret_ty.clone())?;
+
                 for param in &sig.0.params.0 {
                     let arg_ty = engine.type_to_typeinfo(param.0.ty.clone())?;
 
-                    bindings.insert(param.0.name.0.clone(), engine.insert(arg_ty.clone()));
                     args.push(arg_ty);
                 }
-
-                let ret = engine.type_to_typeinfo(sig.0.ret_ty.clone())?;
 
                 bindings.insert(
                     sig.0.name.0.clone(),
                     engine.insert((
                         TypeInfo::Function {
-                            args,
+                            args: args.clone(),
                             ret: Box::new(ret),
                         },
                         sig.1.clone(),
                     )),
                 );
 
-                let body = tc_statement(engine, bindings, &sig, body)?;
+                let mut bindings = bindings.clone();
 
-                Item::Fn { sig, body }
+                for (i, param) in sig.0.params.0.iter().enumerate() {
+                    bindings.insert(
+                        param.0.name.0.clone(),
+                        engine.insert((args[i].0.clone(), param.1.clone())),
+                    );
+                }
+
+                let body = tc_statement(engine, &mut bindings, &sig, body)?;
+
+                Item::Fn { attrs, sig, body }
             }
         },
         item.1.clone(),
     ))
+}
+
+fn tc_attributes(
+    engine: &mut Engine,
+    bindings: &mut HashMap<Ident, TypeId>,
+    attrs: &Spanned<Vec<Spanned<hir::Attribute>>>,
+) -> Result<Spanned<Vec<Spanned<Attribute>>>, Report> {
+    let mut tcd_attrs = vec![];
+
+    for attr in &attrs.0 {
+        tcd_attrs.push((
+            Attribute {
+                name: attr.0.name.clone(),
+                value: tc_expr(engine, bindings, &attr.0.value)?,
+            },
+            attr.1.clone(),
+        ))
+    }
+
+    Ok((tcd_attrs, attrs.1.clone()))
 }
 
 fn tc_function_signature(
@@ -119,10 +155,12 @@ fn tc_statement(
     Ok((
         match stmt.0 {
             hir::Statement::Block(ref stmts) => {
+                let mut bindings = bindings.clone();
+
                 let mut body = vec![];
 
                 for stmt in &stmts.0 {
-                    body.push(tc_statement(engine, bindings, current_fn, stmt)?);
+                    body.push(tc_statement(engine, &mut bindings, current_fn, stmt)?);
                 }
 
                 Statement::Block((body, stmts.1.clone()))
@@ -205,7 +243,7 @@ fn tc_statement(
                 let cond_ty = engine.type_to_typeinfo((cond.0.ty.clone(), cond.1.clone()))?;
                 let cond_ty = engine.insert(cond_ty);
 
-                let bool_ty = engine.insert((TypeInfo::Bool, stmt.1.clone()));
+                let bool_ty = engine.insert((TypeInfo::Bool, cond.1.clone()));
 
                 engine.unify(cond_ty, bool_ty)?;
 
@@ -239,7 +277,7 @@ fn tc_expr(
             hir::Expr::Var(ref name) => {
                 let ty = match bindings.get(&name.0) {
                     Some(id) => engine.reconstruct(*id)?.0,
-                    None => todo!("error cant find var"),
+                    None => todo!("error cant find var {} at {:?}", name.0, name.1),
                 };
 
                 Expr {
