@@ -47,7 +47,6 @@ fn main ||> int {
 fn fib|n: int|> int {
     if n == 0
         return n;
-
     else if n == 1
         return n;
     else
@@ -57,9 +56,8 @@ fn fib|n: int|> int {
 fn main ||> int {
     var n = 10;
 
-    for i in 0..10 {
+    for i in 0..10
         fib(i);
-    }
 
     return 0;
 }
