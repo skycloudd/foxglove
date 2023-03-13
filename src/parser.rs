@@ -542,6 +542,7 @@ fn assignment_target_parser(
             ],
             |span| (Expr::Error, span),
         ))
+        .map_with_span(|inner, span| (inner, span))
         .boxed();
 
     ident_assignment
@@ -549,7 +550,10 @@ fn assignment_target_parser(
         .foldl(|lhs, rhs| {
             let span = lhs.1.start..rhs.1.end;
 
-            (AssignmentTarget::Index(Box::new(lhs), Box::new(rhs)), span)
+            (
+                AssignmentTarget::Index(Box::new(lhs), Box::new(rhs.0)),
+                span,
+            )
         })
         .boxed()
 }
