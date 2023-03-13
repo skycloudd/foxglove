@@ -1,45 +1,15 @@
-### foxglove
+<div align="center" style="display:grid;place-items:center;">
+<p>
+    <a href="https://github.com/skycloudd/foxglove" target="_blank"><img width="80" src="img/logo.png" alt="Foxglove logo"></a>
+</p>
+<h1>Foxglove Programming Language</h1>
 
-Programming language made by [skycloudd](https://github.com/skycloudd/)
+<h2>A simple, modern programming language with clean syntax and amazing error messages (wip)</h2>
+</div>
 
 ***
 
-## Examples
-
-**Calculate a math expression**
-
-```dart
-fn main ||> int {
-    var result = 34 + 35;
-
-    return 0;
-}
-```
-
-**Sort function**
-
-```dart
-fn sort |a: [int], n: int|>
-    for i in 1..n {
-        for j in 1..n {
-            if a[i] < a[j] {
-                var t = a[i];
-
-                a[i] = a[j];
-                a[j] = t;
-            }
-        }
-    }
-
-fn main ||> int {
-    var a = [5, 3, 9, 1, 2, 4, 6, 10, 7, 8];
-    var n = 10;
-
-    sort(a, n);
-
-    return 0;
-}
-```
+## Code examples
 
 **Fibonacci sequence**
 
@@ -58,6 +28,29 @@ fn main ||> int {
 
     for i in 0..10
         fib(i);
+
+    return 0;
+}
+```
+
+**Sort function**
+
+```dart
+fn sort |a: [int], n: int|>
+    for i in 1..n
+        for j in 1..n
+            if a[i] < a[j] {
+                var t = a[i];
+
+                a[i] = a[j];
+                a[j] = t;
+            }
+
+fn main ||> int {
+    var a = [5, 3, 9, 1, 2, 4, 6, 10, 7, 8];
+    var n = 10;
+
+    sort(a, n);
 
     return 0;
 }
