@@ -163,19 +163,22 @@ mod pretty_printing {
     impl Item {
         pub fn to_doc(&self) -> RcDoc<ColorSpec> {
             match self {
-                Item::Fn { attrs, sig, body } => {
-                    RcDoc::intersperse(attrs.0.iter().map(|attr| attr.0.to_doc()), RcDoc::line())
+                Item::Fn { attrs, sig, body } => RcDoc::intersperse(
+                    attrs
+                        .0
+                        .iter()
+                        .map(|attr| attr.0.to_doc().append(RcDoc::line())),
+                    RcDoc::nil(),
+                )
+                .append(
+                    RcDoc::text("fn")
+                        .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
+                        .append(RcDoc::space())
+                        .append(sig.0.to_doc())
                         .append(RcDoc::line())
-                        .append(
-                            RcDoc::text("fn")
-                                .annotate(ColorSpec::new().set_fg(Some(Color::Red)).clone())
-                                .append(RcDoc::space())
-                                .append(sig.0.to_doc())
-                                .append(RcDoc::line())
-                                .append(body.0.to_doc())
-                                .nest(4),
-                        )
-                }
+                        .append(body.0.to_doc())
+                        .nest(4),
+                ),
             }
         }
     }
