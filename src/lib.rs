@@ -46,12 +46,7 @@ pub fn run(config: Config) -> Result<i32, Box<dyn std::error::Error>> {
             Ok(()) => {}
             Err(e) => {
                 // there was an error, so print it
-                eprintln!(
-                    "{}: {}: {}",
-                    filename.display().fg(Color::White),
-                    "Error".fg(Color::Red),
-                    e
-                );
+                eprintln!("{}: {}", filename.display().fg(Color::White), e);
                 exit_code = 1;
 
                 continue;
@@ -122,6 +117,8 @@ fn compile(input: &str, config: CompileConfig) -> Result<(), Box<dyn std::error:
         }
     }
 
+    let mut error_count = 0;
+
     // generate error reports
     // this should only be reached if there are any errors
     Vec::new()
@@ -162,9 +159,20 @@ fn compile(input: &str, config: CompileConfig) -> Result<(), Box<dyn std::error:
                 .finish()
                 .eprint(Source::from(&input))
                 .unwrap_or_else(|e| eprintln!("{}", e.fg(Color::Yellow)));
+
+            error_count += 1;
         });
 
-    Err("compilation failed".into())
+    Err(format!(
+        "{} due to {}",
+        "compilation failed".fg(Color::Red),
+        if error_count == 1 {
+            "1 error".to_owned()
+        } else {
+            format!("{} errors", error_count)
+        }
+    )
+    .into())
 }
 
 type Span = core::ops::Range<usize>;
