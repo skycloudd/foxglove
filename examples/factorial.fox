@@ -1,0 +1,27 @@
+fn recursive_factorial |n: int|> int {
+    if n == 0
+        return 1;
+    else
+        return n * recursive_factorial(n - 1);
+}
+
+fn iterative_factorial |n: int|> int {
+    var result = 1;
+
+    for i in 1..n
+        result = result * i;
+
+    return result;
+}
+
+fn main ||> int {
+    var n = 10;
+
+    for i in 0..10
+        recursive_factorial(i);
+
+    for i in 0..10
+        iterative_factorial(i);
+
+    return 0;
+}
