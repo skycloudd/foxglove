@@ -73,9 +73,7 @@ impl<'a> Typechecker<'a> {
                 }
                 ast::Statement::Let { name, value } => {
                     let value = self.typecheck_expr(*value)?;
-                    let value_ty = self
-                        .engine
-                        .insert(type_to_typeinfo((value.0.ty.clone(), value.1)));
+                    let value_ty = self.engine.insert(type_to_typeinfo((value.0.ty, value.1)));
 
                     let var_ty = self.engine.insert((TypeInfo::Unknown, name.1));
 
@@ -124,9 +122,7 @@ impl<'a> Typechecker<'a> {
                     let op = self.lower_prefix_operator(op);
 
                     let expr = self.typecheck_expr(*expr)?;
-                    let expr_id = self
-                        .engine
-                        .insert(type_to_typeinfo((expr.0.ty.clone(), expr.1)));
+                    let expr_id = self.engine.insert(type_to_typeinfo((expr.0.ty, expr.1)));
                     let expr_ty = self.engine.reconstruct(expr_id)?;
 
                     let ty = expr_ty.0.get_prefix_type(op.0)?;
@@ -143,14 +139,10 @@ impl<'a> Typechecker<'a> {
                     let op = self.lower_binary_operator(op);
 
                     let lhs = self.typecheck_expr(*lhs)?;
-                    let lhs_id = self
-                        .engine
-                        .insert(type_to_typeinfo((lhs.0.ty.clone(), lhs.1)));
+                    let lhs_id = self.engine.insert(type_to_typeinfo((lhs.0.ty, lhs.1)));
 
                     let rhs = self.typecheck_expr(*rhs)?;
-                    let rhs_id = self
-                        .engine
-                        .insert(type_to_typeinfo((rhs.0.ty.clone(), rhs.1)));
+                    let rhs_id = self.engine.insert(type_to_typeinfo((rhs.0.ty, rhs.1)));
 
                     self.engine.unify(lhs_id, rhs_id)?;
 
