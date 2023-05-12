@@ -50,10 +50,9 @@ impl<'src> Interpreter<'src> {
 
                 let var = self.vars.get_mut(&name.0);
 
-                if let Some(var) = var {
-                    *var = value;
-                } else {
-                    self.vars.insert(name.0, value);
+                match var {
+                    Some(var) => *var = value,
+                    None => self.vars.insert(name.0, value),
                 }
             }
             Statement::Print(expr) => {
