@@ -1,7 +1,9 @@
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
-use chumsky::Parser;
+use chumsky::Parser as _;
+use clap::Parser;
 use std::fs::read_to_string;
+use std::path::{Path, PathBuf};
 
 mod ast;
 mod interpreter;
@@ -12,9 +14,9 @@ mod typecheck;
 mod typed_ast;
 
 fn main() {
-    let filename = std::env::args().nth(1).expect("expected filename");
+    let args = Args::parse();
 
-    match run(&filename) {
+    match run(&args.filename) {
         Ok(()) => {}
         Err(e) => {
             eprintln!("{}", e);
@@ -23,7 +25,13 @@ fn main() {
     }
 }
 
-fn run(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    filename: PathBuf,
+}
+
+fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
     let input = read_to_string(filename)?;
 
     let (tokens, lex_errs) = lexer::lexer().parse(&input).into_output_errors();
