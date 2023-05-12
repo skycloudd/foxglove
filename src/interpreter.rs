@@ -45,15 +45,17 @@ impl<'src> Interpreter<'src> {
 
                 self.vars.pop_scope();
             }
-            Statement::Let { name, value } => {
+            Statement::Let { name, ty, value } => {
                 let value = self.interpret_expr(*value)?;
 
-                let var = self.vars.get_mut(&name.0);
+                self.vars.insert(name.0, value);
+            }
+            Statement::Assign { name, value } => {
+                let value = self.interpret_expr(*value)?;
 
-                match var {
-                    Some(var) => *var = value,
-                    None => self.vars.insert(name.0, value),
-                }
+                let var = self.vars.get_mut(&name.0).unwrap();
+
+                *var = value;
             }
             Statement::Print(expr) => {
                 let value = self.interpret_expr(expr)?;
@@ -67,11 +69,7 @@ impl<'src> Interpreter<'src> {
 
     fn interpret_expr(&self, expr: Spanned<Expr>) -> Result<Value, String> {
         match expr.0.expr {
-            ExprKind::Var(name) => self
-                .vars
-                .get(&name.0)
-                .cloned()
-                .ok_or(format!("Variable `{}` not found in scope", name.0,)),
+            ExprKind::Var(name) => Ok(self.vars.get(&name.0).unwrap().clone()),
             ExprKind::Literal(literal) => Ok(match literal.0 {
                 Literal::Num(n) => Value::Num(n),
             }),

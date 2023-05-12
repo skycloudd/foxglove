@@ -10,11 +10,11 @@ pub enum Token<'src> {
 impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::Num(n) => write!(f, "num:{}", n),
-            Token::Operator(op) => write!(f, "op:{}", op),
-            Token::Control(ctrl) => write!(f, "ctrl:{}", ctrl),
-            Token::Keyword(kw) => write!(f, "kw:{}", kw),
-            Token::Ident(name) => write!(f, "ident:{}", name),
+            Token::Num(n) => write!(f, "{}", n),
+            Token::Operator(op) => write!(f, "{}", op),
+            Token::Control(ctrl) => write!(f, "{}", ctrl),
+            Token::Keyword(kw) => write!(f, "{}", kw),
+            Token::Ident(name) => write!(f, "{}", name),
         }
     }
 }
@@ -41,6 +41,7 @@ impl std::fmt::Display for Operator {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Control {
     Semicolon,
+    Colon,
     Equals,
     LeftParen,
     RightParen,
@@ -52,6 +53,7 @@ impl std::fmt::Display for Control {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Control::Semicolon => write!(f, ";"),
+            Control::Colon => write!(f, ":"),
             Control::Equals => write!(f, "="),
             Control::LeftParen => write!(f, "("),
             Control::RightParen => write!(f, ")"),
@@ -64,12 +66,14 @@ impl std::fmt::Display for Control {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Keyword {
     Print,
+    Let,
 }
 
 impl std::fmt::Display for Keyword {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Keyword::Print => write!(f, "print"),
+            Keyword::Let => write!(f, "let"),
         }
     }
 }

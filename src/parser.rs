@@ -54,11 +54,28 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(Statement::Block)
             .boxed();
 
-        let let_ = ident_parser()
+        let let_ = just(Token::Keyword(Keyword::Let))
+            .ignore_then(ident_parser())
+            .then(
+                just(Token::Control(Control::Colon))
+                    .ignore_then(type_parser())
+                    .or_not(),
+            )
             .then_ignore(just(Token::Control(Control::Equals)))
             .then(expression_parser())
             .then_ignore(just(Token::Control(Control::Semicolon)))
-            .map(|(name, value)| Statement::Let {
+            .map(|((name, ty), value)| Statement::Let {
+                name,
+                ty,
+                value: Box::new(value),
+            })
+            .boxed();
+
+        let assign = ident_parser()
+            .then_ignore(just(Token::Control(Control::Equals)))
+            .then(expression_parser())
+            .then_ignore(just(Token::Control(Control::Semicolon)))
+            .map(|(name, value)| Statement::Assign {
                 name,
                 value: Box::new(value),
             })
@@ -70,7 +87,7 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(Statement::Print)
             .boxed();
 
-        choice((expr, block, let_, print))
+        choice((expr, block, let_, assign, print))
             .map_with_span(|statement, span| (statement, span))
             .boxed()
     })
@@ -194,4 +211,17 @@ fn ident_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     select! { Token::Ident(ident) => ident }
         .map_with_span(|ident, span| (ident, span))
         .boxed()
+}
+
+fn type_parser<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    ParserInput<'tokens, 'src>,
+    Spanned<Type>,
+    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+> {
+    select! {
+        Token::Ident("num") => Type::Num,
+    }
+    .map_with_span(|ty, span| (ty, span))
+    .boxed()
 }

@@ -6,6 +6,7 @@ use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 
 mod ast;
+mod error;
 mod interpreter;
 mod lexer;
 mod parser;
@@ -57,7 +58,7 @@ fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
         (None, vec![])
     };
 
-    dbg!(&typed_ast);
+    // dbg!(&typed_ast);
 
     if let Some(typed_ast) = typed_ast {
         interpreter::interpret(typed_ast)?;
@@ -65,24 +66,22 @@ fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
 
     Vec::new()
         .into_iter()
-        .chain(lex_errs.into_iter().map(|e| e.map_token(|t| t.to_string())))
+        .chain(
+            lex_errs
+                .into_iter()
+                .map(|e| e.map_token(|t| t.to_string()))
+                .map(Into::into),
+        )
         .chain(
             parse_errs
                 .into_iter()
-                .map(|e| e.map_token(|t| t.to_string())),
+                .map(|e| e.map_token(|t| t.to_string()))
+                .map(Into::into),
         )
+        .chain(tc_errs)
         .for_each(|e| {
-            eprintln!(
-                "{} `{}`:\t{}",
-                e.span(),
-                &input[e.span().start()..e.span().end()],
-                e
-            );
+            eprintln!("{:?}", e);
         });
-
-    for err in tc_errs {
-        eprintln!("{}", err);
-    }
 
     Ok(())
 }

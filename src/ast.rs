@@ -11,9 +11,19 @@ pub enum Statement<'src> {
     Block(s!(Vec<s!(Statement<'src>)>)),
     Let {
         name: s!(&'src str),
+        ty: Option<s!(Type)>,
+        value: Box<s!(Expr<'src>)>,
+    },
+    Assign {
+        name: s!(&'src str),
         value: Box<s!(Expr<'src>)>,
     },
     Print(s!(Expr<'src>)),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Type {
+    Num,
 }
 
 #[derive(Clone, Debug, PartialEq)]

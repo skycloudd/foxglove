@@ -60,6 +60,7 @@ fn control_lexer<'src>(
 ) -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich<'src, char, Span>>> {
     choice((
         just(";").to(Token::Control(Control::Semicolon)),
+        just(":").to(Token::Control(Control::Colon)),
         just("=").to(Token::Control(Control::Equals)),
         just("(").to(Token::Control(Control::LeftParen)),
         just(")").to(Token::Control(Control::RightParen)),
@@ -71,7 +72,10 @@ fn control_lexer<'src>(
 
 fn keyword_lexer<'src>(
 ) -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich<'src, char, Span>>> {
-    choice((just("print").to(Keyword::Print),))
-        .map(Token::Keyword)
-        .boxed()
+    choice((
+        just("print").to(Keyword::Print),
+        just("let").to(Keyword::Let),
+    ))
+    .map(Token::Keyword)
+    .boxed()
 }
