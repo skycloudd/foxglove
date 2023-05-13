@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-chumsky = "1.0.0-alpha.3"
+chumsky = "1.0.0-alpha.4"
 clap = { version = "4.2.7", features = ["derive"] }
