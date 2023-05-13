@@ -1,0 +1,19 @@
+let a = 123;
+let b = -456;
+let c = a + b;
+
+print a; // 123
+print b; // -456
+print c; // -333
+
+let d = true;
+let e = d;
+
+{
+    let d = false;
+    e = d;
+    print d; // false
+}
+
+print d; // true
+print e; // false

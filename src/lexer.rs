@@ -40,13 +40,20 @@ fn literal_lexer<'src>(
         .map(Token::Num)
         .boxed();
 
-    // choice((num,)).boxed()
-    num
+    choice((num,)).boxed()
 }
 
 fn op_lexer<'src>() -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich<'src, char, Span>>>
 {
     choice((
+        just("==").to(Operator::Equals),
+        just("!=").to(Operator::NotEquals),
+        just("<").to(Operator::LessThan),
+        just("<=").to(Operator::LessThanOrEqual),
+        just(">").to(Operator::GreaterThan),
+        just(">=").to(Operator::GreaterThanOrEqual),
+        just("&&").to(Operator::LogicalAnd),
+        just("||").to(Operator::LogicalOr),
         just("+").to(Operator::Plus),
         just("-").to(Operator::Minus),
         just("*").to(Operator::Star),
@@ -75,6 +82,8 @@ fn keyword_lexer<'src>(
     choice((
         just("print").to(Keyword::Print),
         just("let").to(Keyword::Let),
+        just("true").to(Keyword::True),
+        just("false").to(Keyword::False),
     ))
     .map(Token::Keyword)
     .boxed()

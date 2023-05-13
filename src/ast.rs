@@ -31,11 +31,11 @@ pub enum Expr<'src> {
     Var(s!(&'src str)),
     Literal(s!(Literal)),
     Prefix {
-        op: s!(PrefixOperator),
+        op: s!(PrefixOp),
         expr: Box<s!(Expr<'src>)>,
     },
     Binary {
-        op: s!(BinaryOperator),
+        op: s!(BinOp),
         lhs: Box<s!(Expr<'src>)>,
         rhs: Box<s!(Expr<'src>)>,
     },
@@ -44,19 +44,28 @@ pub enum Expr<'src> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Literal {
     Num(f64),
+    Bool(bool),
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum PrefixOperator {
+pub enum PrefixOp {
     Negate,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BinaryOperator {
+pub enum BinOp {
     Add,
     Subtract,
     Multiply,
     Divide,
+    Equals,
+    NotEquals,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LogicalAnd,
+    LogicalOr,
 }
 
 macro_rules! s {

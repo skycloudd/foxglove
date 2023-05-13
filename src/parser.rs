@@ -120,7 +120,7 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         let atom = choice((var, literal, parenthesized_expr)).boxed();
 
         let prefix_op = just(Token::Operator(Operator::Minus))
-            .to(PrefixOperator::Negate)
+            .to(PrefixOp::Negate)
             .map_with_span(|op, span| (op, span))
             .boxed();
 
@@ -140,8 +140,8 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         let factor_op = choice((
-            just(Token::Operator(Operator::Star)).to(BinaryOperator::Multiply),
-            just(Token::Operator(Operator::Slash)).to(BinaryOperator::Divide),
+            just(Token::Operator(Operator::Star)).to(BinOp::Multiply),
+            just(Token::Operator(Operator::Slash)).to(BinOp::Divide),
         ))
         .map_with_span(|op, span| (op, span))
         .boxed();
@@ -163,8 +163,8 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         let sum_op = choice((
-            just(Token::Operator(Operator::Plus)).to(BinaryOperator::Add),
-            just(Token::Operator(Operator::Minus)).to(BinaryOperator::Subtract),
+            just(Token::Operator(Operator::Plus)).to(BinOp::Add),
+            just(Token::Operator(Operator::Minus)).to(BinOp::Subtract),
         ))
         .map_with_span(|op, span| (op, span))
         .boxed();
@@ -185,7 +185,103 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             })
             .boxed();
 
-        sum
+        let relational_op = choice((
+            just(Token::Operator(Operator::LessThan)).to(BinOp::LessThan),
+            just(Token::Operator(Operator::LessThanOrEqual)).to(BinOp::LessThanOrEqual),
+            just(Token::Operator(Operator::GreaterThan)).to(BinOp::GreaterThan),
+            just(Token::Operator(Operator::GreaterThanOrEqual)).to(BinOp::GreaterThanOrEqual),
+        ))
+        .map_with_span(|op, span| (op, span))
+        .boxed();
+
+        let relational = sum
+            .clone()
+            .foldl(relational_op.then(sum).repeated(), |lhs, (op, rhs)| {
+                let span = lhs.1.start..rhs.1.end;
+
+                (
+                    Expr::Binary {
+                        lhs: Box::new(lhs),
+                        op,
+                        rhs: Box::new(rhs),
+                    },
+                    span.into(),
+                )
+            })
+            .boxed();
+
+        let equality_op = choice((
+            just(Token::Operator(Operator::Equals)).to(BinOp::Equals),
+            just(Token::Operator(Operator::NotEquals)).to(BinOp::NotEquals),
+        ))
+        .map_with_span(|op, span| (op, span))
+        .boxed();
+
+        let equality = relational
+            .clone()
+            .foldl(equality_op.then(relational).repeated(), |lhs, (op, rhs)| {
+                let span = lhs.1.start..rhs.1.end;
+
+                (
+                    Expr::Binary {
+                        lhs: Box::new(lhs),
+                        op,
+                        rhs: Box::new(rhs),
+                    },
+                    span.into(),
+                )
+            })
+            .boxed();
+
+        let logical_and_op = just(Token::Operator(Operator::LogicalAnd))
+            .to(BinOp::LogicalAnd)
+            .map_with_span(|op, span| (op, span))
+            .boxed();
+
+        let logical_and = equality
+            .clone()
+            .foldl(
+                logical_and_op.then(equality).repeated(),
+                |lhs, (op, rhs)| {
+                    let span = lhs.1.start..rhs.1.end;
+
+                    (
+                        Expr::Binary {
+                            lhs: Box::new(lhs),
+                            op,
+                            rhs: Box::new(rhs),
+                        },
+                        span.into(),
+                    )
+                },
+            )
+            .boxed();
+
+        let logical_or_op = just(Token::Operator(Operator::LogicalOr))
+            .to(BinOp::LogicalOr)
+            .map_with_span(|op, span| (op, span))
+            .boxed();
+
+        let logical_or = logical_and
+            .clone()
+            .foldl(
+                logical_or_op.then(logical_and).repeated(),
+                |lhs, (op, rhs)| {
+                    let span = lhs.1.start..rhs.1.end;
+
+                    (
+                        Expr::Binary {
+                            lhs: Box::new(lhs),
+                            op,
+                            rhs: Box::new(rhs),
+                        },
+                        span.into(),
+                    )
+                },
+            )
+            .boxed();
+
+        logical_or
     })
 }
 
@@ -197,6 +293,8 @@ fn literal_parser<'tokens, 'src: 'tokens>() -> impl Parser<
 > {
     select! {
         Token::Num(n) => Literal::Num(n),
+        Token::Keyword(Keyword::True) => Literal::Bool(true),
+        Token::Keyword(Keyword::False) => Literal::Bool(false),
     }
     .map_with_span(|literal, span| (literal, span))
     .boxed()

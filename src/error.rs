@@ -2,6 +2,7 @@ use chumsky::error::RichReason;
 use chumsky::prelude::Rich;
 
 use crate::typecheck::TypeInfo;
+use crate::typed_ast::Type;
 use crate::Span;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -13,6 +14,40 @@ pub enum Error {
     },
     Custom(String),
     Many(Vec<Error>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TypecheckError {
+    UndefinedVariable {
+        name: String,
+        span: Span,
+    },
+    CannotInferType {
+        span: Span,
+    },
+    TypeMismatch {
+        span1: Span,
+        span2: Span,
+        ty1: TypeInfo,
+        ty2: TypeInfo,
+    },
+    CannotApplyUnaryOperator {
+        span: Span,
+        op: String,
+        ty: Type,
+    },
+    CannotApplyBinaryOperator {
+        span: Span,
+        op: String,
+        ty1: Type,
+        ty2: Type,
+    },
+}
+
+impl From<TypecheckError> for Error {
+    fn from(err: TypecheckError) -> Self {
+        Self::Typecheck(err)
+    }
 }
 
 impl From<Rich<'_, String>> for Error {
@@ -31,28 +66,5 @@ impl From<Rich<'_, String>> for Error {
         }
 
         convert_reason(value.reason().clone())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum TypecheckError {
-    UndefinedVariable {
-        name: String,
-        span: Span,
-    },
-    CannotInferType {
-        span: Span,
-    },
-    TypeMismatch {
-        span1: Span,
-        span2: Span,
-        ty1: TypeInfo,
-        ty2: TypeInfo,
-    },
-}
-
-impl From<TypecheckError> for Error {
-    fn from(err: TypecheckError) -> Self {
-        Self::Typecheck(err)
     }
 }

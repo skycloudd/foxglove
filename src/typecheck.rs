@@ -161,7 +161,7 @@ impl<'a> Typechecker<'a> {
                     let expr_id = self.engine.insert(type_to_typeinfo((expr.0.ty, expr.1)));
                     let expr_ty = self.engine.reconstruct(expr_id)?;
 
-                    let ty = expr_ty.0.get_prefix_type(op.0);
+                    let ty = expr_ty.0.get_prefix_type(op)?;
 
                     Expr {
                         expr: ExprKind::Prefix {
@@ -185,7 +185,7 @@ impl<'a> Typechecker<'a> {
                     let lhs_ty = self.engine.reconstruct(lhs_id)?;
                     let rhs_ty = self.engine.reconstruct(rhs_id)?;
 
-                    let ty = lhs_ty.0.get_binary_type(&rhs_ty.0);
+                    let ty = lhs_ty.0.get_binary_type(op, &rhs_ty.0)?;
 
                     Expr {
                         expr: ExprKind::Binary {
@@ -205,27 +205,36 @@ impl<'a> Typechecker<'a> {
         (
             match literal.0 {
                 ast::Literal::Num(n) => Literal::Num(n),
+                ast::Literal::Bool(b) => Literal::Bool(b),
             },
             literal.1,
         )
     }
 
-    fn lower_prefix_operator(&self, op: Spanned<ast::PrefixOperator>) -> Spanned<PrefixOperator> {
+    fn lower_prefix_operator(&self, op: Spanned<ast::PrefixOp>) -> Spanned<PrefixOp> {
         (
             match op.0 {
-                ast::PrefixOperator::Negate => PrefixOperator::Negate,
+                ast::PrefixOp::Negate => PrefixOp::Negate,
             },
             op.1,
         )
     }
 
-    fn lower_binary_operator(&self, op: Spanned<ast::BinaryOperator>) -> Spanned<BinaryOperator> {
+    fn lower_binary_operator(&self, op: Spanned<ast::BinOp>) -> Spanned<BinOp> {
         (
             match op.0 {
-                ast::BinaryOperator::Add => BinaryOperator::Add,
-                ast::BinaryOperator::Subtract => BinaryOperator::Subtract,
-                ast::BinaryOperator::Multiply => BinaryOperator::Multiply,
-                ast::BinaryOperator::Divide => BinaryOperator::Divide,
+                ast::BinOp::Add => BinOp::Add,
+                ast::BinOp::Subtract => BinOp::Subtract,
+                ast::BinOp::Multiply => BinOp::Multiply,
+                ast::BinOp::Divide => BinOp::Divide,
+                ast::BinOp::Equals => BinOp::Equals,
+                ast::BinOp::NotEquals => BinOp::NotEquals,
+                ast::BinOp::LessThan => BinOp::LessThan,
+                ast::BinOp::LessThanOrEqual => BinOp::LessThanOrEqual,
+                ast::BinOp::GreaterThan => BinOp::GreaterThan,
+                ast::BinOp::GreaterThanOrEqual => BinOp::GreaterThanOrEqual,
+                ast::BinOp::LogicalAnd => BinOp::LogicalAnd,
+                ast::BinOp::LogicalOr => BinOp::LogicalOr,
             },
             op.1,
         )
@@ -277,14 +286,18 @@ impl Engine {
                 self.vars.insert(b, (TypeInfo::Ref(a), var_a.1));
                 Ok(())
             }
+
             (TypeInfo::Num, TypeInfo::Num) => Ok(()),
-            // (a, b) => Err(TypecheckError::TypeMismatch {
-            //     span1: var_a.1,
-            //     span2: var_b.1,
-            //     ty1: a,
-            //     ty2: b,
-            // }
-            // .into()),
+
+            (TypeInfo::Bool, TypeInfo::Bool) => Ok(()),
+
+            (a, b) => Err(TypecheckError::TypeMismatch {
+                span1: var_a.1,
+                span2: var_b.1,
+                ty1: a,
+                ty2: b,
+            }
+            .into()),
         }
     }
 
@@ -298,6 +311,7 @@ impl Engine {
                 }
                 TypeInfo::Ref(id) => self.reconstruct(id)?.0,
                 TypeInfo::Num => Type::Num,
+                TypeInfo::Bool => Type::Bool,
             },
             var.1,
         ))
@@ -311,12 +325,14 @@ pub enum TypeInfo {
     Unknown,
     Ref(TypeId),
     Num,
+    Bool,
 }
 
 fn type_to_typeinfo(ty: Spanned<Type>) -> Spanned<TypeInfo> {
     (
         match ty.0 {
             Type::Num => TypeInfo::Num,
+            Type::Bool => TypeInfo::Bool,
         },
         ty.1,
     )
@@ -325,7 +341,7 @@ fn type_to_typeinfo(ty: Spanned<Type>) -> Spanned<TypeInfo> {
 #[derive(Clone, Debug)]
 pub struct Scopes<K, V>(Vec<HashMap<K, V>>);
 
-impl<K, V> Scopes<K, V> {
+impl<K: Eq + Hash, V> Scopes<K, V> {
     pub fn new() -> Scopes<K, V> {
         Scopes(vec![HashMap::new()])
     }
@@ -338,17 +354,11 @@ impl<K, V> Scopes<K, V> {
         self.0.pop();
     }
 
-    pub fn insert(&mut self, k: K, v: V)
-    where
-        K: Eq + Hash,
-    {
+    pub fn insert(&mut self, k: K, v: V) {
         self.0.last_mut().unwrap().insert(k, v);
     }
 
-    pub fn get(&self, k: &K) -> Option<&V>
-    where
-        K: Eq + Hash,
-    {
+    pub fn get(&self, k: &K) -> Option<&V> {
         for scope in self.0.iter().rev() {
             if let Some(v) = scope.get(k) {
                 return Some(v);
@@ -358,10 +368,7 @@ impl<K, V> Scopes<K, V> {
         None
     }
 
-    pub fn get_mut(&mut self, k: &K) -> Option<&mut V>
-    where
-        K: Eq + Hash,
-    {
+    pub fn get_mut(&mut self, k: &K) -> Option<&mut V> {
         for scope in self.0.iter_mut().rev() {
             if let Some(v) = scope.get_mut(k) {
                 return Some(v);
@@ -373,17 +380,68 @@ impl<K, V> Scopes<K, V> {
 }
 
 impl Type {
-    fn get_prefix_type(&self, op: PrefixOperator) -> Type {
+    fn get_prefix_type(&self, op: Spanned<PrefixOp>) -> Result<Type, Error> {
         match self {
-            Type::Num => match op {
-                PrefixOperator::Negate => Type::Num,
+            Type::Num => match op.0 {
+                PrefixOp::Negate => Ok(Type::Num),
             },
+            Type::Bool => Err(TypecheckError::CannotApplyUnaryOperator {
+                span: op.1,
+                op: format!("{:?}", op.0),
+                ty: Type::Bool,
+            }
+            .into()),
         }
     }
 
-    fn get_binary_type(&self, rhs: &Type) -> Type {
-        match (self, rhs) {
-            (Type::Num, Type::Num) => Type::Num,
+    fn get_binary_type(&self, op: Spanned<BinOp>, rhs: &Type) -> Result<Type, Error> {
+        let lhs = self;
+
+        match (lhs, rhs) {
+            (Type::Num, Type::Num) => match op.0 {
+                BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide => Ok(Type::Num),
+                BinOp::Equals
+                | BinOp::NotEquals
+                | BinOp::LessThan
+                | BinOp::LessThanOrEqual
+                | BinOp::GreaterThan
+                | BinOp::GreaterThanOrEqual => Ok(Type::Bool),
+                BinOp::LogicalAnd | BinOp::LogicalOr => {
+                    Err(TypecheckError::CannotApplyBinaryOperator {
+                        span: op.1,
+                        op: format!("{:?}", op.0),
+                        ty1: *lhs,
+                        ty2: *rhs,
+                    }
+                    .into())
+                }
+            },
+            (Type::Bool, Type::Bool) => match op.0 {
+                BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide => {
+                    Err(TypecheckError::CannotApplyBinaryOperator {
+                        span: op.1,
+                        op: format!("{:?}", op.0),
+                        ty1: *lhs,
+                        ty2: *rhs,
+                    }
+                    .into())
+                }
+                BinOp::Equals
+                | BinOp::NotEquals
+                | BinOp::LessThan
+                | BinOp::LessThanOrEqual
+                | BinOp::GreaterThan
+                | BinOp::GreaterThanOrEqual
+                | BinOp::LogicalAnd
+                | BinOp::LogicalOr => Ok(Type::Bool),
+            },
+            (lhs, rhs) => Err(TypecheckError::CannotApplyBinaryOperator {
+                span: op.1,
+                op: format!("{:?}", op.0),
+                ty1: *lhs,
+                ty2: *rhs,
+            }
+            .into()),
         }
     }
 }
@@ -392,6 +450,7 @@ impl Literal {
     fn ty(&self) -> Type {
         match self {
             Literal::Num(_) => Type::Num,
+            Literal::Bool(_) => Type::Bool,
         }
     }
 }

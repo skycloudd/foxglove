@@ -45,7 +45,7 @@ impl<'src> Interpreter<'src> {
 
                 self.vars.pop_scope();
             }
-            Statement::Let { name, ty, value } => {
+            Statement::Let { name, ty: _, value } => {
                 let value = self.interpret_expr(*value)?;
 
                 self.vars.insert(name.0, value);
@@ -72,13 +72,15 @@ impl<'src> Interpreter<'src> {
             ExprKind::Var(name) => Ok(self.vars.get(&name.0).unwrap().clone()),
             ExprKind::Literal(literal) => Ok(match literal.0 {
                 Literal::Num(n) => Value::Num(n),
+                Literal::Bool(b) => Value::Bool(b),
             }),
             ExprKind::Prefix { op, expr } => {
                 let value = self.interpret_expr(*expr)?;
 
                 match op.0 {
-                    PrefixOperator::Negate => match &value {
+                    PrefixOp::Negate => match &value {
                         Value::Num(n) => Ok(Value::Num(-n)),
+                        _ => unreachable!(),
                     },
                 }
             }
@@ -88,11 +90,32 @@ impl<'src> Interpreter<'src> {
 
                 match (lhs, rhs) {
                     (Value::Num(a), Value::Num(b)) => match op.0 {
-                        BinaryOperator::Add => Ok(Value::Num(a + b)),
-                        BinaryOperator::Subtract => Ok(Value::Num(a - b)),
-                        BinaryOperator::Multiply => Ok(Value::Num(a * b)),
-                        BinaryOperator::Divide => Ok(Value::Num(a / b)),
+                        BinOp::Add => Ok(Value::Num(a + b)),
+                        BinOp::Subtract => Ok(Value::Num(a - b)),
+                        BinOp::Multiply => Ok(Value::Num(a * b)),
+                        BinOp::Divide => Ok(Value::Num(a / b)),
+                        BinOp::Equals => Ok(Value::Bool(a == b)),
+                        BinOp::NotEquals => Ok(Value::Bool(a != b)),
+                        BinOp::LessThan => Ok(Value::Bool(a < b)),
+                        BinOp::LessThanOrEqual => Ok(Value::Bool(a <= b)),
+                        BinOp::GreaterThan => Ok(Value::Bool(a > b)),
+                        BinOp::GreaterThanOrEqual => Ok(Value::Bool(a >= b)),
+                        _ => unreachable!(),
                     },
+                    (Value::Bool(a), Value::Bool(b)) => match op.0 {
+                        BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide => {
+                            unreachable!()
+                        }
+                        BinOp::Equals => Ok(Value::Bool(a == b)),
+                        BinOp::NotEquals => Ok(Value::Bool(a != b)),
+                        BinOp::LessThan => Ok(Value::Bool(a < b)),
+                        BinOp::LessThanOrEqual => Ok(Value::Bool(a <= b)),
+                        BinOp::GreaterThan => Ok(Value::Bool(a > b)),
+                        BinOp::GreaterThanOrEqual => Ok(Value::Bool(a >= b)),
+                        BinOp::LogicalAnd => Ok(Value::Bool(a && b)),
+                        BinOp::LogicalOr => Ok(Value::Bool(a || b)),
+                    },
+                    _ => unreachable!(),
                 }
             }
         }
@@ -102,12 +125,14 @@ impl<'src> Interpreter<'src> {
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Value {
     Num(f64),
+    Bool(bool),
 }
 
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Num(n) => write!(f, "{}", n),
+            Value::Bool(b) => write!(f, "{}", b),
         }
     }
 }

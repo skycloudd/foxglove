@@ -25,6 +25,14 @@ pub enum Operator {
     Minus,
     Star,
     Slash,
+    Equals,
+    NotEquals,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LogicalAnd,
+    LogicalOr,
 }
 
 impl std::fmt::Display for Operator {
@@ -34,6 +42,14 @@ impl std::fmt::Display for Operator {
             Operator::Minus => write!(f, "-"),
             Operator::Star => write!(f, "*"),
             Operator::Slash => write!(f, "/"),
+            Operator::Equals => write!(f, "=="),
+            Operator::NotEquals => write!(f, "!="),
+            Operator::LessThan => write!(f, "<"),
+            Operator::LessThanOrEqual => write!(f, "<="),
+            Operator::GreaterThan => write!(f, ">"),
+            Operator::GreaterThanOrEqual => write!(f, ">="),
+            Operator::LogicalAnd => write!(f, "&&"),
+            Operator::LogicalOr => write!(f, "||"),
         }
     }
 }
@@ -67,6 +83,8 @@ impl std::fmt::Display for Control {
 pub enum Keyword {
     Print,
     Let,
+    True,
+    False,
 }
 
 impl std::fmt::Display for Keyword {
@@ -74,6 +92,8 @@ impl std::fmt::Display for Keyword {
         match self {
             Keyword::Print => write!(f, "print"),
             Keyword::Let => write!(f, "let"),
+            Keyword::True => write!(f, "true"),
+            Keyword::False => write!(f, "false"),
         }
     }
 }
