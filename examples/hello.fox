@@ -17,5 +17,3 @@ let e = d;
 
 print d; // true
 print e; // false
-
-true + false;
