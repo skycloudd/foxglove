@@ -24,6 +24,7 @@ pub enum Statement<'src> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Type {
     Num,
+    Bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]

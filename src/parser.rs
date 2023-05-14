@@ -319,6 +319,7 @@ fn type_parser<'tokens, 'src: 'tokens>() -> impl Parser<
 > {
     select! {
         Token::Ident("num") => Type::Num,
+        Token::Ident("bool") => Type::Bool,
     }
     .map_with_span(|ty, span| (ty, span))
     .boxed()

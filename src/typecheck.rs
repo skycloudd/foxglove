@@ -244,6 +244,7 @@ impl<'a> Typechecker<'a> {
         (
             match ty.0 {
                 ast::Type::Num => Type::Num,
+                ast::Type::Bool => Type::Bool,
             },
             ty.1,
         )
@@ -387,7 +388,7 @@ impl Type {
             },
             Type::Bool => Err(TypecheckError::CannotApplyUnaryOperator {
                 span: op.1,
-                op: format!("{:?}", op.0),
+                op: op.0,
                 ty: Type::Bool,
             }
             .into()),
@@ -409,7 +410,7 @@ impl Type {
                 BinOp::LogicalAnd | BinOp::LogicalOr => {
                     Err(TypecheckError::CannotApplyBinaryOperator {
                         span: op.1,
-                        op: format!("{:?}", op.0),
+                        op: op.0,
                         ty1: *lhs,
                         ty2: *rhs,
                     }
@@ -420,7 +421,7 @@ impl Type {
                 BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide => {
                     Err(TypecheckError::CannotApplyBinaryOperator {
                         span: op.1,
-                        op: format!("{:?}", op.0),
+                        op: op.0,
                         ty1: *lhs,
                         ty2: *rhs,
                     }
@@ -437,7 +438,7 @@ impl Type {
             },
             (lhs, rhs) => Err(TypecheckError::CannotApplyBinaryOperator {
                 span: op.1,
-                op: format!("{:?}", op.0),
+                op: op.0,
                 ty1: *lhs,
                 ty2: *rhs,
             }

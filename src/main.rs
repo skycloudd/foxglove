@@ -1,3 +1,4 @@
+use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
 use chumsky::Parser as _;
@@ -80,7 +81,26 @@ fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
         )
         .chain(tc_errs)
         .for_each(|e| {
-            eprintln!("{:?}", e);
+            for (msg, spans, notes) in e.make_report() {
+                let mut report =
+                    Report::build(ReportKind::Error, (), spans.first().unwrap().start())
+                        .with_code(e.code())
+                        .with_message(msg);
+
+                for ((msg, col), span) in spans {
+                    report = report.with_label(
+                        Label::new(span.into_range())
+                            .with_message(msg)
+                            .with_color(col),
+                    );
+                }
+
+                for note in notes {
+                    report = report.with_note(note);
+                }
+
+                report.finish().eprint(Source::from(&input)).unwrap();
+            }
         });
 
     Ok(())
