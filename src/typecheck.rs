@@ -73,7 +73,7 @@ impl<'a> Typechecker<'a> {
                     Statement::Block((statements, stmt.1))
                 }
                 ast::Statement::Let { name, ty, value } => {
-                    let value = self.typecheck_expr(*value)?;
+                    let value = self.typecheck_expr(value)?;
                     let value_ty = self.engine.insert(type_to_typeinfo((value.0.ty, value.1)));
 
                     let ty = ty.map(|ty| self.lower_type(ty));
@@ -94,11 +94,14 @@ impl<'a> Typechecker<'a> {
                     Statement::Let {
                         name,
                         ty: self.engine.reconstruct(ty)?,
-                        value: Box::new(value),
+                        value,
                     }
                 }
+                ast::Statement::Function { name, params, body } => {
+                    todo!()
+                }
                 ast::Statement::Assign { name, value } => {
-                    let value = self.typecheck_expr(*value)?;
+                    let value = self.typecheck_expr(value)?;
                     let value_ty = self.engine.insert(type_to_typeinfo((value.0.ty, value.1)));
 
                     let ty =
@@ -111,10 +114,7 @@ impl<'a> Typechecker<'a> {
 
                     self.engine.unify(value_ty, *ty)?;
 
-                    Statement::Assign {
-                        name,
-                        value: Box::new(value),
-                    }
+                    Statement::Assign { name, value }
                 }
                 ast::Statement::Print(expr) => {
                     let expr = self.typecheck_expr(expr)?;

@@ -12,11 +12,16 @@ pub enum Statement<'src> {
     Let {
         name: s!(&'src str),
         ty: Option<s!(Type)>,
-        value: Box<s!(Expr<'src>)>,
+        value: s!(Expr<'src>),
+    },
+    Function {
+        name: s!(&'src str),
+        params: s!(Vec<(s!(&'src str), s!(Type))>),
+        body: Box<s!(Statement<'src>)>,
     },
     Assign {
         name: s!(&'src str),
-        value: Box<s!(Expr<'src>)>,
+        value: s!(Expr<'src>),
     },
     Print(s!(Expr<'src>)),
 }

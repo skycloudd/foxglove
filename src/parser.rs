@@ -64,21 +64,14 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .then_ignore(just(Token::Control(Control::Equals)))
             .then(expression_parser())
             .then_ignore(just(Token::Control(Control::Semicolon)))
-            .map(|((name, ty), value)| Statement::Let {
-                name,
-                ty,
-                value: Box::new(value),
-            })
+            .map(|((name, ty), value)| Statement::Let { name, ty, value })
             .boxed();
 
         let assign = ident_parser()
             .then_ignore(just(Token::Control(Control::Equals)))
             .then(expression_parser())
             .then_ignore(just(Token::Control(Control::Semicolon)))
-            .map(|(name, value)| Statement::Assign {
-                name,
-                value: Box::new(value),
-            })
+            .map(|(name, value)| Statement::Assign { name, value })
             .boxed();
 
         let print = just(Token::Keyword(Keyword::Print))

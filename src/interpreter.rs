@@ -46,12 +46,15 @@ impl<'src> Interpreter<'src> {
                 self.vars.pop_scope();
             }
             Statement::Let { name, ty: _, value } => {
-                let value = self.interpret_expr(*value)?;
+                let value = self.interpret_expr(value)?;
 
                 self.vars.insert(name.0, value);
             }
+            Statement::Function { name, params, body } => {
+                todo!()
+            }
             Statement::Assign { name, value } => {
-                let value = self.interpret_expr(*value)?;
+                let value = self.interpret_expr(value)?;
 
                 let var = self.vars.get_mut(&name.0).unwrap();
 
