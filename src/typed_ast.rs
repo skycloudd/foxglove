@@ -17,6 +17,7 @@ pub enum Statement<'src> {
     Function {
         name: s!(&'src str),
         params: s!(Vec<(s!(&'src str), s!(Type))>),
+        return_ty: s!(Type),
         body: Box<s!(Statement<'src>)>,
     },
     Assign {
@@ -24,12 +25,14 @@ pub enum Statement<'src> {
         value: s!(Expr<'src>),
     },
     Print(s!(Expr<'src>)),
+    Return(s!(Expr<'src>)),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Type {
     Num,
     Bool,
+    Unit,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,12 +54,17 @@ pub enum ExprKind<'src> {
         lhs: Box<s!(Expr<'src>)>,
         rhs: Box<s!(Expr<'src>)>,
     },
+    Call {
+        callee: Box<s!(Expr<'src>)>,
+        args: s!(Vec<s!(Expr<'src>)>),
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Literal {
     Num(f64),
     Bool(bool),
+    Unit,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]

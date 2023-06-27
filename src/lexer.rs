@@ -6,6 +6,8 @@ pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
     let literal = literal_lexer();
 
+    let unit = just("#").to(Token::Unit).boxed();
+
     let op = op_lexer();
 
     let control = control_lexer();
@@ -14,7 +16,7 @@ pub fn lexer<'src>(
 
     let ident = text::ident().map(Token::Ident).boxed();
 
-    let token = choice((literal, op, control, keyword, ident)).boxed();
+    let token = choice((literal, unit, op, control, keyword, ident)).boxed();
 
     let comment = just("//")
         .then(any().and_is(just('\n').not()).repeated())
@@ -73,6 +75,7 @@ fn control_lexer<'src>(
         just(")").to(Token::Control(Control::RightParen)),
         just("{").to(Token::Control(Control::LeftCurly)),
         just("}").to(Token::Control(Control::RightCurly)),
+        just(",").to(Token::Control(Control::Comma)),
     ))
     .boxed()
 }
@@ -84,6 +87,8 @@ fn keyword_lexer<'src>(
         just("let").to(Keyword::Let),
         just("true").to(Keyword::True),
         just("false").to(Keyword::False),
+        just("func").to(Keyword::Func),
+        just("return").to(Keyword::Return),
     ))
     .map(Token::Keyword)
     .boxed()

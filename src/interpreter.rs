@@ -31,10 +31,15 @@ impl<'src> Interpreter<'src> {
         Ok(())
     }
 
-    fn interpret_statement(&mut self, statement: Spanned<Statement<'src>>) -> Result<(), String> {
+    fn interpret_statement(
+        &mut self,
+        statement: Spanned<Statement<'src>>,
+    ) -> Result<ControlFlow, String> {
         match statement.0 {
             Statement::Expr(expr) => {
                 let _ = self.interpret_expr(expr)?;
+
+                Ok(ControlFlow::Normal)
             }
             Statement::Block(statements) => {
                 self.vars.push_scope();
@@ -44,14 +49,25 @@ impl<'src> Interpreter<'src> {
                 }
 
                 self.vars.pop_scope();
+
+                Ok(ControlFlow::Normal)
             }
             Statement::Let { name, ty: _, value } => {
                 let value = self.interpret_expr(value)?;
 
                 self.vars.insert(name.0, value);
+
+                Ok(ControlFlow::Normal)
             }
-            Statement::Function { name, params, body } => {
-                todo!()
+            Statement::Function {
+                name,
+                params,
+                return_ty,
+                body,
+            } => {
+                todo!();
+
+                Ok(ControlFlow::Normal)
             }
             Statement::Assign { name, value } => {
                 let value = self.interpret_expr(value)?;
@@ -59,15 +75,22 @@ impl<'src> Interpreter<'src> {
                 let var = self.vars.get_mut(&name.0).unwrap();
 
                 *var = value;
+
+                Ok(ControlFlow::Normal)
             }
             Statement::Print(expr) => {
                 let value = self.interpret_expr(expr)?;
 
                 println!("{}", value);
+
+                Ok(ControlFlow::Normal)
+            }
+            Statement::Return(expr) => {
+                let value = self.interpret_expr(expr)?;
+
+                Ok(ControlFlow::Return(value))
             }
         }
-
-        Ok(())
     }
 
     fn interpret_expr(&self, expr: Spanned<Expr>) -> Result<Value, String> {
@@ -76,6 +99,7 @@ impl<'src> Interpreter<'src> {
             ExprKind::Literal(literal) => Ok(match literal.0 {
                 Literal::Num(n) => Value::Num(n),
                 Literal::Bool(b) => Value::Bool(b),
+                Literal::Unit => Value::Unit,
             }),
             ExprKind::Prefix { op, expr } => {
                 let value = self.interpret_expr(*expr)?;
@@ -129,6 +153,7 @@ impl<'src> Interpreter<'src> {
 pub enum Value {
     Num(f64),
     Bool(bool),
+    Unit,
 }
 
 impl std::fmt::Display for Value {
@@ -136,6 +161,13 @@ impl std::fmt::Display for Value {
         match self {
             Value::Num(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
+            Value::Unit => write!(f, "#"),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub enum ControlFlow {
+    Normal,
+    Return(Value),
 }

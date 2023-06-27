@@ -97,7 +97,12 @@ impl<'a> Typechecker<'a> {
                         value,
                     }
                 }
-                ast::Statement::Function { name, params, body } => {
+                ast::Statement::Function {
+                    name,
+                    params,
+                    return_ty,
+                    body,
+                } => {
                     todo!()
                 }
                 ast::Statement::Assign { name, value } => {
@@ -117,9 +122,36 @@ impl<'a> Typechecker<'a> {
                     Statement::Assign { name, value }
                 }
                 ast::Statement::Print(expr) => {
+                    let expr = match expr {
+                        Some(expr) => expr,
+                        None => (
+                            ast::Expr::Literal((
+                                ast::Literal::Unit,
+                                (stmt.1.end..stmt.1.end).into(),
+                            )),
+                            (stmt.1.end..stmt.1.end).into(),
+                        ),
+                    };
+
                     let expr = self.typecheck_expr(expr)?;
 
                     Statement::Print(expr)
+                }
+                ast::Statement::Return(expr) => {
+                    let expr = match expr {
+                        Some(expr) => expr,
+                        None => (
+                            ast::Expr::Literal((
+                                ast::Literal::Unit,
+                                (stmt.1.end..stmt.1.end).into(),
+                            )),
+                            (stmt.1.end..stmt.1.end).into(),
+                        ),
+                    };
+
+                    let expr = self.typecheck_expr(expr)?;
+
+                    Statement::Return(expr)
                 }
             },
             stmt.1,
@@ -196,6 +228,9 @@ impl<'a> Typechecker<'a> {
                         ty,
                     }
                 }
+                ast::Expr::Call { callee, args } => {
+                    todo!()
+                }
             },
             expr.1,
         ))
@@ -206,6 +241,7 @@ impl<'a> Typechecker<'a> {
             match literal.0 {
                 ast::Literal::Num(n) => Literal::Num(n),
                 ast::Literal::Bool(b) => Literal::Bool(b),
+                ast::Literal::Unit => Literal::Unit,
             },
             literal.1,
         )
@@ -245,6 +281,7 @@ impl<'a> Typechecker<'a> {
             match ty.0 {
                 ast::Type::Num => Type::Num,
                 ast::Type::Bool => Type::Bool,
+                ast::Type::Unit => Type::Unit,
             },
             ty.1,
         )
@@ -313,6 +350,7 @@ impl Engine {
                 TypeInfo::Ref(id) => self.reconstruct(id)?.0,
                 TypeInfo::Num => Type::Num,
                 TypeInfo::Bool => Type::Bool,
+                TypeInfo::Unit => Type::Unit,
             },
             var.1,
         ))
@@ -327,6 +365,7 @@ pub enum TypeInfo {
     Ref(TypeId),
     Num,
     Bool,
+    Unit,
 }
 
 fn type_to_typeinfo(ty: Spanned<Type>) -> Spanned<TypeInfo> {
@@ -334,6 +373,7 @@ fn type_to_typeinfo(ty: Spanned<Type>) -> Spanned<TypeInfo> {
         match ty.0 {
             Type::Num => TypeInfo::Num,
             Type::Bool => TypeInfo::Bool,
+            Type::Unit => TypeInfo::Unit,
         },
         ty.1,
     )
@@ -389,7 +429,13 @@ impl Type {
             Type::Bool => Err(TypecheckError::CannotApplyUnaryOperator {
                 span: op.1,
                 op: op.0,
-                ty: Type::Bool,
+                ty: *self,
+            }
+            .into()),
+            Type::Unit => Err(TypecheckError::CannotApplyUnaryOperator {
+                span: op.1,
+                op: op.0,
+                ty: *self,
             }
             .into()),
         }
@@ -452,6 +498,7 @@ impl Literal {
         match self {
             Literal::Num(_) => Type::Num,
             Literal::Bool(_) => Type::Bool,
+            Literal::Unit => Type::Unit,
         }
     }
 }

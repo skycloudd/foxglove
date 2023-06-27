@@ -67,6 +67,35 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(|((name, ty), value)| Statement::Let { name, ty, value })
             .boxed();
 
+        let func_args = ident_parser()
+            .then_ignore(just(Token::Control(Control::Colon)))
+            .then(type_parser())
+            .separated_by(just(Token::Control(Control::Comma)))
+            .allow_trailing()
+            .collect()
+            .map_with_span(|params, span| (params, span))
+            .delimited_by(
+                just(Token::Control(Control::LeftParen)),
+                just(Token::Control(Control::RightParen)),
+            );
+
+        let func = just(Token::Keyword(Keyword::Func))
+            .ignore_then(ident_parser())
+            .then(func_args)
+            .then(
+                just(Token::Control(Control::Colon))
+                    .ignore_then(type_parser())
+                    .or_not(),
+            )
+            .then(block.clone().map_with_span(|block, span| (block, span)))
+            .map(|(((name, params), return_ty), body)| Statement::Function {
+                name,
+                params,
+                return_ty,
+                body: Box::new(body),
+            })
+            .boxed();
+
         let assign = ident_parser()
             .then_ignore(just(Token::Control(Control::Equals)))
             .then(expression_parser())
@@ -75,12 +104,18 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         let print = just(Token::Keyword(Keyword::Print))
-            .ignore_then(expression_parser())
+            .ignore_then(expression_parser().or_not())
             .then_ignore(just(Token::Control(Control::Semicolon)))
             .map(Statement::Print)
             .boxed();
 
-        choice((expr, block, let_, assign, print))
+        let return_ = just(Token::Keyword(Keyword::Return))
+            .ignore_then(expression_parser().or_not())
+            .then_ignore(just(Token::Control(Control::Semicolon)))
+            .map(Statement::Return)
+            .boxed();
+
+        choice((expr, block, let_, func, assign, print, return_))
             .map_with_span(|statement, span| (statement, span))
             .boxed()
     })
@@ -313,6 +348,7 @@ fn type_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     select! {
         Token::Ident("num") => Type::Num,
         Token::Ident("bool") => Type::Bool,
+        Token::Unit => Type::Unit,
     }
     .map_with_span(|ty, span| (ty, span))
     .boxed()

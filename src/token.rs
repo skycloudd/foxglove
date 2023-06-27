@@ -1,6 +1,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Token<'src> {
     Num(f64),
+    Unit,
     Operator(Operator),
     Control(Control),
     Keyword(Keyword),
@@ -11,6 +12,7 @@ impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Token::Num(n) => write!(f, "{}", n),
+            Token::Unit => write!(f, "#"),
             Token::Operator(op) => write!(f, "{}", op),
             Token::Control(ctrl) => write!(f, "{}", ctrl),
             Token::Keyword(kw) => write!(f, "{}", kw),
@@ -63,6 +65,7 @@ pub enum Control {
     RightParen,
     LeftCurly,
     RightCurly,
+    Comma,
 }
 
 impl std::fmt::Display for Control {
@@ -75,6 +78,7 @@ impl std::fmt::Display for Control {
             Control::RightParen => write!(f, ")"),
             Control::LeftCurly => write!(f, "{{"),
             Control::RightCurly => write!(f, "}}"),
+            Control::Comma => write!(f, ","),
         }
     }
 }
@@ -85,6 +89,8 @@ pub enum Keyword {
     Let,
     True,
     False,
+    Func,
+    Return,
 }
 
 impl std::fmt::Display for Keyword {
@@ -94,6 +100,8 @@ impl std::fmt::Display for Keyword {
             Keyword::Let => write!(f, "let"),
             Keyword::True => write!(f, "true"),
             Keyword::False => write!(f, "false"),
+            Keyword::Func => write!(f, "func"),
+            Keyword::Return => write!(f, "return"),
         }
     }
 }
