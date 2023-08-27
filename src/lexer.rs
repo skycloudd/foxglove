@@ -4,37 +4,7 @@ use chumsky::prelude::*;
 
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
-    let literal = literal_lexer();
-
-    let unit = just("#").to(Token::Unit).boxed();
-
-    let op = op_lexer();
-
-    let control = control_lexer();
-
-    let keyword = keyword_lexer();
-
-    let ident = text::ident().map(Token::Ident).boxed();
-
-    let token = choice((literal, unit, op, control, keyword, ident)).boxed();
-
-    let comment = just("//")
-        .then(any().and_is(just('\n').not()).repeated())
-        .padded()
-        .boxed();
-
-    token
-        .map_with_span(|tok, span| (tok, span))
-        .padded_by(comment.repeated())
-        .padded()
-        .recover_with(skip_then_retry_until(any().ignored(), end()))
-        .repeated()
-        .collect()
-}
-
-fn literal_lexer<'src>(
-) -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich<'src, char, Span>>> {
-    let num = text::int(10)
+    let literal = text::int(10)
         .then(just('.').then(text::digits(10)).or_not())
         .slice()
         .from_str()
@@ -42,12 +12,9 @@ fn literal_lexer<'src>(
         .map(Token::Num)
         .boxed();
 
-    choice((num,)).boxed()
-}
+    let unit = just("#").to(Token::Unit).boxed();
 
-fn op_lexer<'src>() -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich<'src, char, Span>>>
-{
-    choice((
+    let op = choice((
         just("==").to(Operator::Equals),
         just("!=").to(Operator::NotEquals),
         just("<").to(Operator::LessThan),
@@ -62,12 +29,9 @@ fn op_lexer<'src>() -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich
         just("/").to(Operator::Slash),
     ))
     .map(Token::Operator)
-    .boxed()
-}
+    .boxed();
 
-fn control_lexer<'src>(
-) -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich<'src, char, Span>>> {
-    choice((
+    let control = choice((
         just(";").to(Token::Control(Control::Semicolon)),
         just(":").to(Token::Control(Control::Colon)),
         just("=").to(Token::Control(Control::Equals)),
@@ -77,17 +41,30 @@ fn control_lexer<'src>(
         just("}").to(Token::Control(Control::RightCurly)),
         just(",").to(Token::Control(Control::Comma)),
     ))
-    .boxed()
-}
+    .boxed();
 
-fn keyword_lexer<'src>(
-) -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich<'src, char, Span>>> {
-    choice((
-        just("print").to(Keyword::Print),
-        just("let").to(Keyword::Let),
-        just("true").to(Keyword::True),
-        just("false").to(Keyword::False),
-    ))
-    .map(Token::Keyword)
-    .boxed()
+    let ident = text::ident()
+        .map(|ident| match ident {
+            "print" => Token::Keyword(Keyword::Print),
+            "let" => Token::Keyword(Keyword::Let),
+            "true" => Token::Keyword(Keyword::True),
+            "false" => Token::Keyword(Keyword::False),
+            _ => Token::Ident(ident),
+        })
+        .boxed();
+
+    let token = choice((literal, unit, op, control, ident)).boxed();
+
+    let comment = just("//")
+        .then(any().and_is(just('\n').not()).repeated())
+        .padded()
+        .boxed();
+
+    token
+        .map_with_span(|tok, span| (tok, span))
+        .padded_by(comment.repeated())
+        .padded()
+        .recover_with(skip_then_retry_until(any().ignored(), end()))
+        .repeated()
+        .collect()
 }
