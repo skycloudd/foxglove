@@ -87,8 +87,6 @@ fn keyword_lexer<'src>(
         just("let").to(Keyword::Let),
         just("true").to(Keyword::True),
         just("false").to(Keyword::False),
-        just("func").to(Keyword::Func),
-        just("return").to(Keyword::Return),
     ))
     .map(Token::Keyword)
     .boxed()

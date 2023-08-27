@@ -97,14 +97,6 @@ impl<'a> Typechecker<'a> {
                         value,
                     }
                 }
-                ast::Statement::Function {
-                    name,
-                    params,
-                    return_ty,
-                    body,
-                } => {
-                    todo!()
-                }
                 ast::Statement::Assign { name, value } => {
                     let value = self.typecheck_expr(value)?;
                     let value_ty = self.engine.insert(type_to_typeinfo((value.0.ty, value.1)));
@@ -136,22 +128,6 @@ impl<'a> Typechecker<'a> {
                     let expr = self.typecheck_expr(expr)?;
 
                     Statement::Print(expr)
-                }
-                ast::Statement::Return(expr) => {
-                    let expr = match expr {
-                        Some(expr) => expr,
-                        None => (
-                            ast::Expr::Literal((
-                                ast::Literal::Unit,
-                                (stmt.1.end..stmt.1.end).into(),
-                            )),
-                            (stmt.1.end..stmt.1.end).into(),
-                        ),
-                    };
-
-                    let expr = self.typecheck_expr(expr)?;
-
-                    Statement::Return(expr)
                 }
             },
             stmt.1,
@@ -227,9 +203,6 @@ impl<'a> Typechecker<'a> {
                         },
                         ty,
                     }
-                }
-                ast::Expr::Call { callee, args } => {
-                    todo!()
                 }
             },
             expr.1,
@@ -361,6 +334,7 @@ type TypeId = usize;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum TypeInfo {
+    #[allow(dead_code)]
     Unknown,
     Ref(TypeId),
     Num,

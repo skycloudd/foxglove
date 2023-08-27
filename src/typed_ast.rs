@@ -14,18 +14,11 @@ pub enum Statement<'src> {
         ty: s!(Type),
         value: s!(Expr<'src>),
     },
-    Function {
-        name: s!(&'src str),
-        params: s!(Vec<(s!(&'src str), s!(Type))>),
-        return_ty: s!(Type),
-        body: Box<s!(Statement<'src>)>,
-    },
     Assign {
         name: s!(&'src str),
         value: s!(Expr<'src>),
     },
     Print(s!(Expr<'src>)),
-    Return(s!(Expr<'src>)),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,10 +46,6 @@ pub enum ExprKind<'src> {
         op: s!(BinOp),
         lhs: Box<s!(Expr<'src>)>,
         rhs: Box<s!(Expr<'src>)>,
-    },
-    Call {
-        callee: Box<s!(Expr<'src>)>,
-        args: s!(Vec<s!(Expr<'src>)>),
     },
 }
 

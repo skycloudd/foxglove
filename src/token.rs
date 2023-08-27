@@ -89,8 +89,6 @@ pub enum Keyword {
     Let,
     True,
     False,
-    Func,
-    Return,
 }
 
 impl std::fmt::Display for Keyword {
@@ -100,8 +98,6 @@ impl std::fmt::Display for Keyword {
             Keyword::Let => write!(f, "let"),
             Keyword::True => write!(f, "true"),
             Keyword::False => write!(f, "false"),
-            Keyword::Func => write!(f, "func"),
-            Keyword::Return => write!(f, "return"),
         }
     }
 }

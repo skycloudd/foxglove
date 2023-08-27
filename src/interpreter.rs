@@ -59,16 +59,6 @@ impl<'src> Interpreter<'src> {
 
                 Ok(ControlFlow::Normal)
             }
-            Statement::Function {
-                name,
-                params,
-                return_ty,
-                body,
-            } => {
-                todo!();
-
-                Ok(ControlFlow::Normal)
-            }
             Statement::Assign { name, value } => {
                 let value = self.interpret_expr(value)?;
 
@@ -84,11 +74,6 @@ impl<'src> Interpreter<'src> {
                 println!("{}", value);
 
                 Ok(ControlFlow::Normal)
-            }
-            Statement::Return(expr) => {
-                let value = self.interpret_expr(expr)?;
-
-                Ok(ControlFlow::Return(value))
             }
         }
     }
@@ -135,9 +120,9 @@ impl<'src> Interpreter<'src> {
                         }
                         BinOp::Equals => Ok(Value::Bool(a == b)),
                         BinOp::NotEquals => Ok(Value::Bool(a != b)),
-                        BinOp::LessThan => Ok(Value::Bool(a < b)),
+                        BinOp::LessThan => Ok(Value::Bool(!a & b)),
                         BinOp::LessThanOrEqual => Ok(Value::Bool(a <= b)),
-                        BinOp::GreaterThan => Ok(Value::Bool(a > b)),
+                        BinOp::GreaterThan => Ok(Value::Bool(a & !b)),
                         BinOp::GreaterThanOrEqual => Ok(Value::Bool(a >= b)),
                         BinOp::LogicalAnd => Ok(Value::Bool(a && b)),
                         BinOp::LogicalOr => Ok(Value::Bool(a || b)),
@@ -169,5 +154,4 @@ impl std::fmt::Display for Value {
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum ControlFlow {
     Normal,
-    Return(Value),
 }

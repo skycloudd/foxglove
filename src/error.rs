@@ -67,7 +67,7 @@ impl Error {
                     vec![],
                 )]
             }
-            Error::Many(errors) => errors.iter().map(Error::make_report).flatten().collect(),
+            Error::Many(errors) => errors.iter().flat_map(Error::make_report).collect(),
         }
     }
 
@@ -203,7 +203,7 @@ impl From<Rich<'_, String>> for Error {
         fn convert_reason(reason: RichReason<String>, span: Span) -> Error {
             match reason {
                 RichReason::ExpectedFound { expected, found } => Error::ExpectedFound {
-                    span: span,
+                    span,
                     expected: expected.iter().map(ToString::to_string).collect(),
                     found: found.map(|s| s.to_string()),
                 },

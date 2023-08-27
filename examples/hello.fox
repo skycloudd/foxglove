@@ -17,15 +17,3 @@ let e = d;
 
 print d; // true
 print e; // false
-
-func math_thing(a: num, b: num, c: num) {
-    let d = a + b;
-    let e = d * c;
-    return e;
-}
-
-let f = math_thing(1, 2, 3);
-print f; // 9
-
-let g = math_thing(4, 5, 6);
-print g; // 54
