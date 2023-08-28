@@ -19,6 +19,9 @@ pub enum Statement<'src> {
         value: s!(Expr<'src>),
     },
     Print(Option<s!(Expr<'src>)>),
+    Loop(Box<s!(Statement<'src>)>),
+    Continue,
+    Break,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,7 +48,7 @@ pub enum Expr<'src> {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Literal {
-    Num(f64),
+    Num(i32),
     Bool(bool),
     Unit,
 }

@@ -1,6 +1,6 @@
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Token<'src> {
-    Num(f64),
+    Num(i32),
     Unit,
     Operator(Operator),
     Control(Control),
@@ -89,6 +89,9 @@ pub enum Keyword {
     Let,
     True,
     False,
+    Loop,
+    Continue,
+    Break,
 }
 
 impl std::fmt::Display for Keyword {
@@ -98,6 +101,9 @@ impl std::fmt::Display for Keyword {
             Keyword::Let => write!(f, "let"),
             Keyword::True => write!(f, "true"),
             Keyword::False => write!(f, "false"),
+            Keyword::Loop => write!(f, "loop"),
+            Keyword::Continue => write!(f, "continue"),
+            Keyword::Break => write!(f, "break"),
         }
     }
 }

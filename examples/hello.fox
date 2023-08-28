@@ -17,3 +17,11 @@ let e = d;
 
 print d; // true
 print e; // false
+
+let f = 0;
+
+loop {
+    f = f + 1;
+
+    print f;
+}

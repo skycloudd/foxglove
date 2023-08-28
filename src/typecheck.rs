@@ -129,6 +129,13 @@ impl<'a> Typechecker<'a> {
 
                     Statement::Print(expr)
                 }
+                ast::Statement::Loop(stmt) => {
+                    let stmt = self.typecheck_statement(*stmt)?;
+
+                    Statement::Loop(Box::new(stmt))
+                }
+                ast::Statement::Continue => Statement::Continue,
+                ast::Statement::Break => Statement::Break,
             },
             stmt.1,
         ))

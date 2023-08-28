@@ -44,6 +44,7 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         let block = statement
+            .clone()
             .repeated()
             .collect()
             .delimited_by(
@@ -80,7 +81,22 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(Statement::Print)
             .boxed();
 
-        choice((expr, block, let_, assign, print))
+        let loop_ = just(Token::Keyword(Keyword::Loop))
+            .ignore_then(statement)
+            .map(|body| Statement::Loop(Box::new(body)))
+            .boxed();
+
+        let continue_ = just(Token::Keyword(Keyword::Continue))
+            .then_ignore(just(Token::Control(Control::Semicolon)))
+            .map(|_| Statement::Continue)
+            .boxed();
+
+        let break_ = just(Token::Keyword(Keyword::Break))
+            .then_ignore(just(Token::Control(Control::Semicolon)))
+            .map(|_| Statement::Break)
+            .boxed();
+
+        choice((expr, block, let_, assign, print, loop_, continue_, break_))
             .map_with_span(|statement, span| (statement, span))
             .boxed()
     })

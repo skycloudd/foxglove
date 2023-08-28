@@ -19,6 +19,9 @@ pub enum Statement<'src> {
         value: s!(Expr<'src>),
     },
     Print(s!(Expr<'src>)),
+    Loop(Box<s!(Statement<'src>)>),
+    Continue,
+    Break,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,7 +54,7 @@ pub enum ExprKind<'src> {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Literal {
-    Num(f64),
+    Num(i32),
     Bool(bool),
     Unit,
 }

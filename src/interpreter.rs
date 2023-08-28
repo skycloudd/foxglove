@@ -45,7 +45,10 @@ impl<'src> Interpreter<'src> {
                 self.vars.push_scope();
 
                 for statement in statements.0 {
-                    self.interpret_statement(statement)?;
+                    match self.interpret_statement(statement)? {
+                        ControlFlow::Normal => {}
+                        cf => return Ok(cf),
+                    }
                 }
 
                 self.vars.pop_scope();
@@ -75,6 +78,19 @@ impl<'src> Interpreter<'src> {
 
                 Ok(ControlFlow::Normal)
             }
+            Statement::Loop(body) => {
+                loop {
+                    match self.interpret_statement(*body.clone())? {
+                        ControlFlow::Normal => {}
+                        ControlFlow::Continue => continue,
+                        ControlFlow::Break => break,
+                    }
+                }
+
+                Ok(ControlFlow::Normal)
+            }
+            Statement::Continue => Ok(ControlFlow::Continue),
+            Statement::Break => Ok(ControlFlow::Break),
         }
     }
 
@@ -136,7 +152,7 @@ impl<'src> Interpreter<'src> {
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Value {
-    Num(f64),
+    Num(i32),
     Bool(bool),
     Unit,
 }
@@ -154,4 +170,6 @@ impl std::fmt::Display for Value {
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum ControlFlow {
     Normal,
+    Continue,
+    Break,
 }
