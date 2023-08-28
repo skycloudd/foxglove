@@ -22,6 +22,11 @@ pub enum Statement<'src> {
     Loop(Box<s!(Statement<'src>)>),
     Continue,
     Break,
+    Conditional {
+        condition: s!(Expr<'src>),
+        then: Box<s!(Statement<'src>)>,
+        otherwise: Option<Box<s!(Statement<'src>)>>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

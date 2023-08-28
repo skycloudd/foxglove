@@ -82,7 +82,7 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         let loop_ = just(Token::Keyword(Keyword::Loop))
-            .ignore_then(statement)
+            .ignore_then(statement.clone())
             .map(|body| Statement::Loop(Box::new(body)))
             .boxed();
 
@@ -96,9 +96,31 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(|_| Statement::Break)
             .boxed();
 
-        choice((expr, block, let_, assign, print, loop_, continue_, break_))
-            .map_with_span(|statement, span| (statement, span))
-            .boxed()
+        let if_ = just(Token::Keyword(Keyword::If))
+            .ignore_then(expression_parser())
+            .then(statement.clone().delimited_by(
+                just(Token::Control(Control::LeftCurly)),
+                just(Token::Control(Control::RightCurly)),
+            ))
+            .then(
+                (just(Token::Keyword(Keyword::Else)).ignore_then(statement.delimited_by(
+                    just(Token::Control(Control::LeftCurly)),
+                    just(Token::Control(Control::RightCurly)),
+                )))
+                .or_not(),
+            )
+            .map(|((condition, then), otherwise)| Statement::Conditional {
+                condition,
+                then: Box::new(then),
+                otherwise: otherwise.map(Box::new),
+            })
+            .boxed();
+
+        choice((
+            expr, block, let_, assign, print, loop_, continue_, break_, if_,
+        ))
+        .map_with_span(|statement, span| (statement, span))
+        .boxed()
     })
 }
 

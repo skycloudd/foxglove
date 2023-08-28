@@ -136,6 +136,38 @@ impl<'a> Typechecker<'a> {
                 }
                 ast::Statement::Continue => Statement::Continue,
                 ast::Statement::Break => Statement::Break,
+                ast::Statement::Conditional {
+                    condition,
+                    then,
+                    otherwise,
+                } => {
+                    let condition = self.typecheck_expr(condition)?;
+                    let condition_ty = self
+                        .engine
+                        .insert(type_to_typeinfo((condition.0.ty, condition.1)));
+                    let bool_ty = self
+                        .engine
+                        .insert(type_to_typeinfo((Type::Bool, condition.1)));
+
+                    self.engine.unify(condition_ty, bool_ty)?;
+
+                    let then = self.typecheck_statement(*then)?;
+
+                    let otherwise = match otherwise {
+                        Some(otherwise) => {
+                            let otherwise = self.typecheck_statement(*otherwise)?;
+
+                            Some(Box::new(otherwise))
+                        }
+                        None => None,
+                    };
+
+                    Statement::Conditional {
+                        condition,
+                        then: Box::new(then),
+                        otherwise,
+                    }
+                }
             },
             stmt.1,
         ))

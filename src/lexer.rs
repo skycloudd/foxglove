@@ -11,12 +11,12 @@ pub fn lexer<'src>(
     let op = choice((
         just("==").to(Operator::Equals),
         just("!=").to(Operator::NotEquals),
-        just("<").to(Operator::LessThan),
         just("<=").to(Operator::LessThanOrEqual),
-        just(">").to(Operator::GreaterThan),
         just(">=").to(Operator::GreaterThanOrEqual),
         just("&&").to(Operator::LogicalAnd),
         just("||").to(Operator::LogicalOr),
+        just("<").to(Operator::LessThan),
+        just(">").to(Operator::GreaterThan),
         just("+").to(Operator::Plus),
         just("-").to(Operator::Minus),
         just("*").to(Operator::Star),
@@ -46,6 +46,8 @@ pub fn lexer<'src>(
             "loop" => Token::Keyword(Keyword::Loop),
             "continue" => Token::Keyword(Keyword::Continue),
             "break" => Token::Keyword(Keyword::Break),
+            "if" => Token::Keyword(Keyword::If),
+            "else" => Token::Keyword(Keyword::Else),
             _ => Token::Ident(ident),
         })
         .boxed();

@@ -24,4 +24,8 @@ loop {
     f = f + 1;
 
     print f;
+
+    if f >= 10 {
+        break;
+    }
 }

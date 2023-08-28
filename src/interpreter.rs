@@ -91,6 +91,27 @@ impl<'src> Interpreter<'src> {
             }
             Statement::Continue => Ok(ControlFlow::Continue),
             Statement::Break => Ok(ControlFlow::Break),
+            Statement::Conditional {
+                condition,
+                then,
+                otherwise,
+            } => {
+                let condition = self.interpret_expr(condition)?;
+
+                if condition == Value::Bool(true) {
+                    match self.interpret_statement(*then)? {
+                        ControlFlow::Normal => {}
+                        cf => return Ok(cf),
+                    }
+                } else if let Some(otherwise) = otherwise {
+                    match self.interpret_statement(*otherwise)? {
+                        ControlFlow::Normal => {}
+                        cf => return Ok(cf),
+                    }
+                }
+
+                Ok(ControlFlow::Normal)
+            }
         }
     }
 

@@ -92,6 +92,8 @@ pub enum Keyword {
     Loop,
     Continue,
     Break,
+    If,
+    Else,
 }
 
 impl std::fmt::Display for Keyword {
@@ -104,6 +106,8 @@ impl std::fmt::Display for Keyword {
             Keyword::Loop => write!(f, "loop"),
             Keyword::Continue => write!(f, "continue"),
             Keyword::Break => write!(f, "break"),
+            Keyword::If => write!(f, "if"),
+            Keyword::Else => write!(f, "else"),
         }
     }
 }
