@@ -46,8 +46,8 @@ impl<'src> Interpreter<'src> {
 
                 for statement in statements.0 {
                     match self.interpret_statement(statement)? {
-                        ControlFlow::Normal => {}
-                        cf => return Ok(cf),
+                        ControlFlow::Normal => (),
+                        cf @ (ControlFlow::Break | ControlFlow::Continue) => return Ok(cf),
                     }
                 }
 
@@ -100,13 +100,13 @@ impl<'src> Interpreter<'src> {
 
                 if condition == Value::Bool(true) {
                     match self.interpret_statement(*then)? {
-                        ControlFlow::Normal => {}
-                        cf => return Ok(cf),
+                        ControlFlow::Normal => (),
+                        cf @ (ControlFlow::Break | ControlFlow::Continue) => return Ok(cf),
                     }
                 } else if let Some(otherwise) = otherwise {
                     match self.interpret_statement(*otherwise)? {
-                        ControlFlow::Normal => {}
-                        cf => return Ok(cf),
+                        ControlFlow::Normal => (),
+                        cf @ (ControlFlow::Break | ControlFlow::Continue) => return Ok(cf),
                     }
                 }
 

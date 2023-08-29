@@ -439,13 +439,7 @@ impl Type {
             Type::Num => match op.0 {
                 PrefixOp::Negate => Ok(Type::Num),
             },
-            Type::Bool => Err(TypecheckError::CannotApplyUnaryOperator {
-                span: op.1,
-                op: op.0,
-                ty: *self,
-            }
-            .into()),
-            Type::Unit => Err(TypecheckError::CannotApplyUnaryOperator {
+            Type::Bool | Type::Unit => Err(TypecheckError::CannotApplyUnaryOperator {
                 span: op.1,
                 op: op.0,
                 ty: *self,

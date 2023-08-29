@@ -2,7 +2,7 @@ use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
 use chumsky::Parser as _;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 
@@ -18,19 +18,27 @@ mod typed_ast;
 fn main() {
     let args = Args::parse();
 
-    match run(&args.filename) {
-        Ok(()) => {}
-        Err(e) => {
-            eprintln!("{}", e);
-            std::process::exit(1);
-        }
+    match args.command {
+        Command::Run { filename } => match run(&filename) {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("{}", e);
+                std::process::exit(1);
+            }
+        },
     }
 }
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    filename: PathBuf,
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    Run { filename: PathBuf },
 }
 
 fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
