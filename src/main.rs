@@ -1,3 +1,5 @@
+#![warn(clippy::disallowed_types)] // prevent accidental use of std hashmaps which are slower
+
 use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
@@ -61,7 +63,7 @@ fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
     let (typed_ast, tc_errs) = if let Some(ast) = ast {
         match typecheck::typecheck(ast) {
             Ok(typed_ast) => (Some(typed_ast), vec![]),
-            Err(tc_errs) => (None, vec![tc_errs]),
+            Err(tc_err) => (None, vec![tc_err]),
         }
     } else {
         (None, vec![])
@@ -89,7 +91,7 @@ fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
         )
         .chain(tc_errs)
         .for_each(|e| {
-            for (msg, spans, notes) in e.make_report() {
+            for (msg, spans, note) in e.make_report() {
                 let mut report =
                     Report::build(ReportKind::Error, (), spans.first().unwrap().start())
                         .with_code(e.code())
@@ -103,10 +105,9 @@ fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
                     );
                 }
 
-                for note in notes {
+                if let Some(note) = note {
                     report = report.with_note(note);
                 }
-
                 report.finish().eprint(Source::from(&input)).unwrap();
             }
         });

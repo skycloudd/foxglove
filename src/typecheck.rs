@@ -2,7 +2,7 @@ use crate::ast::{self, Ast};
 use crate::error::{Error, TypecheckError};
 use crate::typed_ast::*;
 use crate::Spanned;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::hash::Hash;
 
 pub fn typecheck(ast: Spanned<Ast>) -> Result<Spanned<TypedAst>, Error> {
@@ -302,14 +302,14 @@ impl<'a> Typechecker<'a> {
 
 struct Engine {
     id_counter: usize,
-    vars: HashMap<TypeId, Spanned<TypeInfo>>,
+    vars: FxHashMap<TypeId, Spanned<TypeInfo>>,
 }
 
 impl Engine {
     fn new() -> Self {
         Self {
             id_counter: 0,
-            vars: HashMap::new(),
+            vars: FxHashMap::default(),
         }
     }
 
@@ -393,15 +393,15 @@ fn type_to_typeinfo(ty: Spanned<Type>) -> Spanned<TypeInfo> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Scopes<K, V>(Vec<HashMap<K, V>>);
+pub struct Scopes<K, V>(Vec<FxHashMap<K, V>>);
 
 impl<K: Eq + Hash, V> Scopes<K, V> {
     pub fn new() -> Scopes<K, V> {
-        Scopes(vec![HashMap::new()])
+        Scopes(vec![FxHashMap::default()])
     }
 
     pub fn push_scope(&mut self) {
-        self.0.push(HashMap::new());
+        self.0.push(FxHashMap::default());
     }
 
     pub fn pop_scope(&mut self) {

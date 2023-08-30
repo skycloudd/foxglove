@@ -19,10 +19,10 @@ pub enum Error {
 
 type Message = String;
 type Spans = Vec<Spanned<(String, Color)>>;
-type Notes = Vec<String>;
+type Note = Option<String>;
 
 impl Error {
-    pub fn make_report(&self) -> Vec<(Message, Spans, Notes)> {
+    pub fn make_report(&self) -> Vec<(Message, Spans, Note)> {
         match self {
             Error::Typecheck(e) => vec![e.make_report()],
             Error::ExpectedFound {
@@ -58,13 +58,13 @@ impl Error {
                     ),
                     *span,
                 )],
-                vec![],
+                None,
             )],
             Error::Custom(span, msg) => {
                 vec![(
                     msg.to_string(),
                     vec![((String::new(), Color::Yellow), *span)],
-                    vec![],
+                    None,
                 )]
             }
             Error::Many(errors) => errors.iter().flat_map(Error::make_report).collect(),
@@ -116,7 +116,7 @@ pub enum TypecheckError {
 }
 
 impl TypecheckError {
-    fn make_report(&self) -> (Message, Spans, Notes) {
+    fn make_report(&self) -> (Message, Spans, Note) {
         match self {
             TypecheckError::UndefinedVariable { name, span } => (
                 format!("Undefined variable '{}'", name.fg(Color::Yellow)),
@@ -124,7 +124,7 @@ impl TypecheckError {
                     ("not found in this scope".to_string(), Color::Yellow),
                     *span,
                 )],
-                vec![],
+                None,
             ),
             TypecheckError::CannotInferType { span } => (
                 "Cannot infer type".to_string(),
@@ -135,7 +135,7 @@ impl TypecheckError {
                     ),
                     *span,
                 )],
-                vec!["help: try adding a type annotation".to_string()],
+                Some("help: try adding a type annotation".to_string()),
             ),
             TypecheckError::TypeMismatch {
                 span1,
@@ -148,7 +148,7 @@ impl TypecheckError {
                     ((format!("Type '{:?}' here", ty1), Color::Yellow), *span1),
                     ((format!("Type '{:?}' here", ty2), Color::Yellow), *span2),
                 ],
-                vec![],
+                None,
             ),
             TypecheckError::CannotApplyUnaryOperator { span, op, ty } => (
                 format!(
@@ -166,7 +166,7 @@ impl TypecheckError {
                     ),
                     *span,
                 )],
-                vec![],
+                None,
             ),
             TypecheckError::CannotApplyBinaryOperator { span, op, ty1, ty2 } => (
                 format!(
@@ -186,7 +186,7 @@ impl TypecheckError {
                     ),
                     *span,
                 )],
-                vec![],
+                None,
             ),
         }
     }

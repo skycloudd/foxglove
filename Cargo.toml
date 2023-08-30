@@ -7,3 +7,4 @@ edition = "2021"
 ariadne = "0.2.0"
 chumsky = "1.0.0-alpha.4"
 clap = { version = "4.2.7", features = ["derive"] }
+rustc-hash = "1.1.0"
