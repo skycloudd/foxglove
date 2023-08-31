@@ -113,11 +113,12 @@ fn run<'src>(input: &'src str) -> Result<Spanned<TypedAst<'src>>, Vec<error::Err
                 .map(Into::into),
         )
         .chain(tc_errs)
-        .collect();
+        .collect::<Vec<_>>();
 
-    match typed_ast {
-        Some(typed_ast) => Ok(typed_ast),
-        None => Err(errs),
+    if errs.is_empty() {
+        Ok(typed_ast.unwrap())
+    } else {
+        Err(errs)
     }
 }
 
