@@ -6,7 +6,8 @@ use chumsky::span::SimpleSpan;
 use chumsky::Parser as _;
 use clap::{Parser, Subcommand};
 use std::fs::read_to_string;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use typed_ast::TypedAst;
 
 mod ast;
 mod error;
@@ -21,13 +22,40 @@ fn main() {
     let args = Args::parse();
 
     match args.command {
-        Command::Run { filename } => match run(&filename) {
-            Ok(()) => {}
-            Err(e) => {
-                eprintln!("{}", e);
-                std::process::exit(1);
+        Command::Run { filename } => {
+            let input = read_to_string(&filename).unwrap();
+
+            match run(&input) {
+                Ok(typed_ast) => match interpreter::interpret(typed_ast) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        eprintln!("runtime error: {}", e);
+                        std::process::exit(1);
+                    }
+                },
+                Err(e) => {
+                    print_errors(e, &input);
+
+                    std::process::exit(1);
+                }
             }
-        },
+        }
+        Command::Build { filenames } => {
+            for filename in filenames {
+                let input = read_to_string(&filename).unwrap();
+
+                match run(&input) {
+                    Ok(typed_ast) => {
+                        todo!("compile: {:?}", typed_ast)
+                    }
+                    Err(e) => {
+                        print_errors(e, &input);
+
+                        continue;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -41,11 +69,10 @@ struct Args {
 #[derive(Subcommand)]
 enum Command {
     Run { filename: PathBuf },
+    Build { filenames: Vec<PathBuf> },
 }
 
-fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
-    let input = read_to_string(filename)?;
-
+fn run<'src>(input: &'src str) -> Result<Spanned<TypedAst<'src>>, Vec<error::Error>> {
     let (tokens, lex_errs) = lexer::lexer().parse(&input).into_output_errors();
 
     // dbg!(&tokens);
@@ -71,11 +98,7 @@ fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
 
     // dbg!(&typed_ast);
 
-    if let Some(typed_ast) = typed_ast {
-        interpreter::interpret(typed_ast)?;
-    }
-
-    Vec::new()
+    let errs = Vec::new()
         .into_iter()
         .chain(
             lex_errs
@@ -90,31 +113,37 @@ fn run<P: AsRef<Path>>(filename: P) -> Result<(), Box<dyn std::error::Error>> {
                 .map(Into::into),
         )
         .chain(tc_errs)
-        .for_each(|e| {
-            for (msg, spans, note) in e.make_report() {
-                let mut report =
-                    Report::build(ReportKind::Error, (), spans.first().unwrap().start())
-                        .with_code(e.code())
-                        .with_message(msg);
+        .collect();
 
-                for ((msg, col), span) in spans {
-                    report = report.with_label(
-                        Label::new(span.into_range())
-                            .with_message(msg)
-                            .with_color(col),
-                    );
-                }
-
-                if let Some(note) = note {
-                    report = report.with_note(note);
-                }
-                report.finish().eprint(Source::from(&input)).unwrap();
-            }
-        });
-
-    Ok(())
+    match typed_ast {
+        Some(typed_ast) => Ok(typed_ast),
+        None => Err(errs),
+    }
 }
 
 pub type Span = SimpleSpan<usize>;
 
 pub type Spanned<T> = (T, Span);
+
+fn print_errors(errors: Vec<error::Error>, input: &str) {
+    for e in errors {
+        for (msg, spans, note) in e.make_report() {
+            let mut report = Report::build(ReportKind::Error, (), spans.first().unwrap().start())
+                .with_code(e.code())
+                .with_message(msg);
+
+            for ((msg, col), span) in spans {
+                report = report.with_label(
+                    Label::new(span.into_range())
+                        .with_message(msg)
+                        .with_color(col),
+                );
+            }
+
+            if let Some(note) = note {
+                report = report.with_note(note);
+            }
+            report.finish().eprint(Source::from(input)).unwrap();
+        }
+    }
+}
