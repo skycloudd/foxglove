@@ -7,6 +7,7 @@ pub struct Ast<'src> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement<'src> {
+    Error,
     Expr(s!(Expr<'src>)),
     Block(s!(Vec<s!(Statement<'src>)>)),
     Let {

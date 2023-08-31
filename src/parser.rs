@@ -119,6 +119,15 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         choice((
             expr, block, let_, assign, print, loop_, continue_, break_, if_,
         ))
+        .recover_with(via_parser(nested_delimiters(
+            Token::Control(Control::LeftCurly),
+            Token::Control(Control::RightCurly),
+            [(
+                Token::Control(Control::LeftParen),
+                Token::Control(Control::RightParen),
+            )],
+            |_| Statement::Error,
+        )))
         .map_with_span(|statement, span| (statement, span))
         .boxed()
     })

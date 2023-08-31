@@ -36,6 +36,7 @@ impl<'src> Interpreter<'src> {
         statement: Spanned<Statement<'src>>,
     ) -> Result<ControlFlow, String> {
         match statement.0 {
+            Statement::Error => unreachable!(),
             Statement::Expr(expr) => {
                 let _ = self.interpret_expr(expr)?;
 

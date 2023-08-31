@@ -90,7 +90,7 @@ fn run<'src>(input: &'src str) -> Result<Spanned<TypedAst<'src>>, Vec<error::Err
     let (typed_ast, tc_errs) = if let Some(ast) = ast {
         match typecheck::typecheck(ast) {
             Ok(typed_ast) => (Some(typed_ast), vec![]),
-            Err(tc_err) => (None, vec![tc_err]),
+            Err(tc_errs) => (None, tc_errs),
         }
     } else {
         (None, vec![])

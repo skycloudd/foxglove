@@ -5,7 +5,7 @@ use crate::Spanned;
 use rustc_hash::FxHashMap;
 use std::hash::Hash;
 
-pub fn typecheck(ast: Spanned<Ast>) -> Result<Spanned<TypedAst>, Error> {
+pub fn typecheck(ast: Spanned<Ast>) -> Result<Spanned<TypedAst>, Vec<Error>> {
     let mut checker = Typechecker::new();
 
     checker.typecheck_ast(ast)
@@ -27,25 +27,31 @@ impl<'a> Typechecker<'a> {
     fn typecheck_ast<'src: 'a>(
         &mut self,
         ast: Spanned<Ast<'src>>,
-    ) -> Result<Spanned<TypedAst<'src>>, Error> {
+    ) -> Result<Spanned<TypedAst<'src>>, Vec<Error>> {
+        let mut statements = vec![];
+        let mut errors = vec![];
+
         self.bindings.push_scope();
 
-        let statements = ast
-            .0
-            .statements
-            .0
-            .into_iter()
-            .map(|stmt| self.typecheck_statement(stmt))
-            .collect::<Result<Vec<_>, _>>()?;
+        for statement in ast.0.statements.0 {
+            match self.typecheck_statement(statement) {
+                Ok(stmt) => statements.push(stmt),
+                Err(err) => errors.push(err),
+            }
+        }
 
         self.bindings.pop_scope();
 
-        Ok((
-            TypedAst {
-                statements: (statements, ast.0.statements.1),
-            },
-            ast.1,
-        ))
+        if errors.is_empty() {
+            Ok((
+                TypedAst {
+                    statements: (statements, ast.0.statements.1),
+                },
+                ast.1,
+            ))
+        } else {
+            Err(errors)
+        }
     }
 
     fn typecheck_statement<'src: 'a>(
@@ -54,6 +60,7 @@ impl<'a> Typechecker<'a> {
     ) -> Result<Spanned<Statement<'src>>, Error> {
         Ok((
             match stmt.0 {
+                ast::Statement::Error => Statement::Error,
                 ast::Statement::Expr(expr) => {
                     let expr = self.typecheck_expr(expr)?;
 
