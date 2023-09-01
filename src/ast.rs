@@ -39,6 +39,7 @@ pub enum Type {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<'src> {
+    Error,
     Var(s!(&'src str)),
     Literal(s!(Literal)),
     Prefix {

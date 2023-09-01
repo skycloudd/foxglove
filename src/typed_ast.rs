@@ -45,6 +45,7 @@ pub struct Expr<'src> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind<'src> {
+    Error,
     Var(s!(&'src str)),
     Literal(s!(Literal)),
     Prefix {

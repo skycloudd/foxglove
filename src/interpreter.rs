@@ -118,6 +118,7 @@ impl<'src> Interpreter<'src> {
 
     fn interpret_expr(&self, expr: Spanned<Expr>) -> Result<Value, String> {
         match expr.0.expr {
+            ExprKind::Error => unreachable!(),
             ExprKind::Var(name) => Ok(self.vars.get(&name.0).unwrap().clone()),
             ExprKind::Literal(literal) => Ok(match literal.0 {
                 Literal::Num(n) => Value::Num(n),

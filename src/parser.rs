@@ -322,7 +322,15 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             )
             .boxed();
 
-        logical_or
+        logical_or.recover_with(via_parser(nested_delimiters(
+            Token::Control(Control::LeftParen),
+            Token::Control(Control::RightParen),
+            [(
+                Token::Control(Control::LeftCurly),
+                Token::Control(Control::RightCurly),
+            )],
+            |span| (Expr::Error, span),
+        )))
     })
 }
 

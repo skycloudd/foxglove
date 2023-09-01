@@ -186,6 +186,10 @@ impl<'a> Typechecker<'a> {
     ) -> Result<Spanned<Expr<'src>>, Error> {
         Ok((
             match expr.0 {
+                ast::Expr::Error => Expr {
+                    expr: ExprKind::Error,
+                    ty: Type::Unit,
+                },
                 ast::Expr::Var(name) => {
                     let ty =
                         self.bindings

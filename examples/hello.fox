@@ -21,11 +21,15 @@ print e; // false
 let f = 0;
 
 loop {
-    f = f + 1;
+    print f; // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 
-    print f;
+    f = f + 1;
 
     if f >= 10 {
         break;
     }
 }
+
+let number: num = 123;
+let not_a_number: bool = true;
+print number + not_a_number;
