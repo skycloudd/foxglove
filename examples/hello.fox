@@ -29,7 +29,3 @@ loop {
         break;
     }
 }
-
-let number: num = 123;
-let not_a_number: bool = true;
-print number + not_a_number;
