@@ -28,6 +28,10 @@ pub enum Statement<'src> {
         then: Box<s!(Statement<'src>)>,
         otherwise: Option<Box<s!(Statement<'src>)>>,
     },
+    While {
+        condition: s!(Expr<'src>),
+        body: Box<s!(Statement<'src>)>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

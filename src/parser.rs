@@ -103,7 +103,7 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
                 just(Token::Control(Control::RightCurly)),
             ))
             .then(
-                (just(Token::Keyword(Keyword::Else)).ignore_then(statement.delimited_by(
+                (just(Token::Keyword(Keyword::Else)).ignore_then(statement.clone().delimited_by(
                     just(Token::Control(Control::LeftCurly)),
                     just(Token::Control(Control::RightCurly)),
                 )))
@@ -116,8 +116,17 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             })
             .boxed();
 
+        let while_ = just(Token::Keyword(Keyword::While))
+            .ignore_then(expression_parser())
+            .then(statement)
+            .map(|(condition, body)| Statement::While {
+                condition,
+                body: Box::new(body),
+            })
+            .boxed();
+
         choice((
-            expr, block, let_, assign, print, loop_, continue_, break_, if_,
+            expr, block, let_, assign, print, loop_, continue_, break_, if_, while_,
         ))
         .recover_with(via_parser(nested_delimiters(
             Token::Control(Control::LeftCurly),

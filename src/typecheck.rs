@@ -175,6 +175,29 @@ impl<'a> Typechecker<'a> {
                         otherwise,
                     }
                 }
+                ast::Statement::While { condition, body } => {
+                    let condition = self.typecheck_expr(condition)?;
+
+                    let condition_ty = self
+                        .engine
+                        .insert(type_to_typeinfo((condition.0.ty, condition.1)));
+                    let bool_ty = self
+                        .engine
+                        .insert(type_to_typeinfo((Type::Bool, condition.1)));
+
+                    self.engine.unify(condition_ty, bool_ty)?;
+
+                    let body = self.typecheck_statement(*body)?;
+
+                    Statement::Loop(Box::new((
+                        Statement::Conditional {
+                            condition: condition.clone(),
+                            then: Box::new(body.clone()),
+                            otherwise: Some(Box::new((Statement::Break, body.1))),
+                        },
+                        condition.1,
+                    )))
+                }
             },
             stmt.1,
         ))

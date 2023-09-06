@@ -94,6 +94,7 @@ pub enum Keyword {
     Break,
     If,
     Else,
+    While,
 }
 
 impl std::fmt::Display for Keyword {
@@ -108,6 +109,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Break => write!(f, "break"),
             Keyword::If => write!(f, "if"),
             Keyword::Else => write!(f, "else"),
+            Keyword::While => write!(f, "while"),
         }
     }
 }

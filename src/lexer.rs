@@ -48,6 +48,7 @@ pub fn lexer<'src>(
             "break" => Token::Keyword(Keyword::Break),
             "if" => Token::Keyword(Keyword::If),
             "else" => Token::Keyword(Keyword::Else),
+            "while" => Token::Keyword(Keyword::While),
             _ => Token::Ident(ident),
         })
         .boxed();

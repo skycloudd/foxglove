@@ -20,13 +20,9 @@ impl<'src> Interpreter<'src> {
     }
 
     fn interpret_ast(&mut self, ast: Spanned<TypedAst<'src>>) -> Result<(), String> {
-        self.vars.push_scope();
-
         for statement in ast.0.statements.0 {
             self.interpret_statement(statement)?;
         }
-
-        self.vars.pop_scope();
 
         Ok(())
     }
