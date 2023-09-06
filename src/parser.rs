@@ -131,10 +131,16 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         .recover_with(via_parser(nested_delimiters(
             Token::Control(Control::LeftCurly),
             Token::Control(Control::RightCurly),
-            [(
-                Token::Control(Control::LeftParen),
-                Token::Control(Control::RightParen),
-            )],
+            [
+                (
+                    Token::Control(Control::LeftParen),
+                    Token::Control(Control::RightParen),
+                ),
+                (
+                    Token::Control(Control::LeftSquare),
+                    Token::Control(Control::RightSquare),
+                ),
+            ],
             |_| Statement::Error,
         )))
         .map_with_span(|statement, span| (statement, span))
@@ -334,10 +340,16 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         logical_or.recover_with(via_parser(nested_delimiters(
             Token::Control(Control::LeftParen),
             Token::Control(Control::RightParen),
-            [(
-                Token::Control(Control::LeftCurly),
-                Token::Control(Control::RightCurly),
-            )],
+            [
+                (
+                    Token::Control(Control::LeftCurly),
+                    Token::Control(Control::RightCurly),
+                ),
+                (
+                    Token::Control(Control::LeftSquare),
+                    Token::Control(Control::RightSquare),
+                ),
+            ],
             |span| (Expr::Error, span),
         )))
     })

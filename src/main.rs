@@ -23,7 +23,7 @@ fn main() {
 
     match args.command {
         Command::Run { filename } => {
-            let input = read_to_string(&filename).unwrap();
+            let input = read_to_string(filename).unwrap();
 
             match run(&input) {
                 Ok(typed_ast) => match interpreter::interpret(typed_ast) {
@@ -72,8 +72,8 @@ enum Command {
     Build { filenames: Vec<PathBuf> },
 }
 
-fn run<'src>(input: &'src str) -> Result<Spanned<TypedAst<'src>>, Vec<error::Error>> {
-    let (tokens, lex_errs) = lexer::lexer().parse(&input).into_output_errors();
+fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
+    let (tokens, lex_errs) = lexer::lexer().parse(input).into_output_errors();
 
     // dbg!(&tokens);
 

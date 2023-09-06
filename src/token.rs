@@ -65,6 +65,8 @@ pub enum Control {
     RightParen,
     LeftCurly,
     RightCurly,
+    LeftSquare,
+    RightSquare,
     Comma,
 }
 
@@ -78,6 +80,8 @@ impl std::fmt::Display for Control {
             Control::RightParen => write!(f, ")"),
             Control::LeftCurly => write!(f, "{{"),
             Control::RightCurly => write!(f, "}}"),
+            Control::LeftSquare => write!(f, "["),
+            Control::RightSquare => write!(f, "]"),
             Control::Comma => write!(f, ","),
         }
     }

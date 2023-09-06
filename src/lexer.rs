@@ -33,6 +33,8 @@ pub fn lexer<'src>(
         just(")").to(Token::Control(Control::RightParen)),
         just("{").to(Token::Control(Control::LeftCurly)),
         just("}").to(Token::Control(Control::RightCurly)),
+        just("[").to(Token::Control(Control::LeftSquare)),
+        just("]").to(Token::Control(Control::RightSquare)),
         just(",").to(Token::Control(Control::Comma)),
     ))
     .boxed();
