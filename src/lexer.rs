@@ -4,7 +4,7 @@ use chumsky::prelude::*;
 
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
-    let literal = text::int(10).from_str().unwrapped().map(Token::Num).boxed();
+    let literal = text::int(10).from_str().unwrapped().map(Token::Int).boxed();
 
     let unit = just("#").to(Token::Unit).boxed();
 

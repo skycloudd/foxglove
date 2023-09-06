@@ -117,7 +117,7 @@ impl<'src> Interpreter<'src> {
             ExprKind::Error => unreachable!(),
             ExprKind::Var(name) => Ok(self.vars.get(&name.0).unwrap().clone()),
             ExprKind::Literal(literal) => Ok(match literal.0 {
-                Literal::Num(n) => Value::Num(n),
+                Literal::Int(n) => Value::Int(n),
                 Literal::Bool(b) => Value::Bool(b),
                 Literal::Unit => Value::Unit,
             }),
@@ -126,7 +126,7 @@ impl<'src> Interpreter<'src> {
 
                 match op.0 {
                     PrefixOp::Negate => match &value {
-                        Value::Num(n) => Ok(Value::Num(-n)),
+                        Value::Int(n) => Ok(Value::Int(-n)),
                         _ => unreachable!(),
                     },
                 }
@@ -136,11 +136,11 @@ impl<'src> Interpreter<'src> {
                 let rhs = self.interpret_expr(*rhs)?;
 
                 match (lhs, rhs) {
-                    (Value::Num(a), Value::Num(b)) => match op.0 {
-                        BinOp::Add => Ok(Value::Num(a + b)),
-                        BinOp::Subtract => Ok(Value::Num(a - b)),
-                        BinOp::Multiply => Ok(Value::Num(a * b)),
-                        BinOp::Divide => Ok(Value::Num(a / b)),
+                    (Value::Int(a), Value::Int(b)) => match op.0 {
+                        BinOp::Add => Ok(Value::Int(a + b)),
+                        BinOp::Subtract => Ok(Value::Int(a - b)),
+                        BinOp::Multiply => Ok(Value::Int(a * b)),
+                        BinOp::Divide => Ok(Value::Int(a / b)),
                         BinOp::Equals => Ok(Value::Bool(a == b)),
                         BinOp::NotEquals => Ok(Value::Bool(a != b)),
                         BinOp::LessThan => Ok(Value::Bool(a < b)),
@@ -171,7 +171,7 @@ impl<'src> Interpreter<'src> {
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Value {
-    Num(i32),
+    Int(i32),
     Bool(bool),
     Unit,
 }
@@ -179,7 +179,7 @@ pub enum Value {
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::Num(n) => write!(f, "{}", n),
+            Value::Int(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Unit => write!(f, "#"),
         }

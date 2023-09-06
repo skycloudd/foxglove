@@ -32,7 +32,7 @@ pub enum Statement<'src> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Type {
-    Num,
+    Int,
     Bool,
     Unit,
 }
@@ -61,7 +61,7 @@ pub enum ExprKind<'src> {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Literal {
-    Num(i32),
+    Int(i32),
     Bool(bool),
     Unit,
 }

@@ -350,7 +350,7 @@ fn literal_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
     select! {
-        Token::Num(n) => Literal::Num(n),
+        Token::Int(n) => Literal::Int(n),
         Token::Keyword(Keyword::True) => Literal::Bool(true),
         Token::Keyword(Keyword::False) => Literal::Bool(false),
     }
@@ -376,7 +376,7 @@ fn type_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
     select! {
-        Token::Ident("num") => Type::Num,
+        Token::Ident("int") => Type::Int,
         Token::Ident("bool") => Type::Bool,
         Token::Unit => Type::Unit,
     }

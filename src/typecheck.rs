@@ -285,7 +285,7 @@ impl<'a> Typechecker<'a> {
     fn lower_literal(&self, literal: Spanned<ast::Literal>) -> Spanned<Literal> {
         (
             match literal.0 {
-                ast::Literal::Num(n) => Literal::Num(n),
+                ast::Literal::Int(n) => Literal::Int(n),
                 ast::Literal::Bool(b) => Literal::Bool(b),
                 ast::Literal::Unit => Literal::Unit,
             },
@@ -325,7 +325,7 @@ impl<'a> Typechecker<'a> {
     fn lower_type(&self, ty: Spanned<ast::Type>) -> Spanned<Type> {
         (
             match ty.0 {
-                ast::Type::Num => Type::Num,
+                ast::Type::Int => Type::Int,
                 ast::Type::Bool => Type::Bool,
                 ast::Type::Unit => Type::Unit,
             },
@@ -371,7 +371,7 @@ impl Engine {
                 Ok(())
             }
 
-            (TypeInfo::Num, TypeInfo::Num) => Ok(()),
+            (TypeInfo::Int, TypeInfo::Int) => Ok(()),
 
             (TypeInfo::Bool, TypeInfo::Bool) => Ok(()),
 
@@ -394,7 +394,7 @@ impl Engine {
                     return Err(TypecheckError::CannotInferType { span: var.1 }.into())
                 }
                 TypeInfo::Ref(id) => self.reconstruct(id)?.0,
-                TypeInfo::Num => Type::Num,
+                TypeInfo::Int => Type::Int,
                 TypeInfo::Bool => Type::Bool,
                 TypeInfo::Unit => Type::Unit,
             },
@@ -410,7 +410,7 @@ pub enum TypeInfo {
     #[allow(dead_code)]
     Unknown,
     Ref(TypeId),
-    Num,
+    Int,
     Bool,
     Unit,
 }
@@ -418,7 +418,7 @@ pub enum TypeInfo {
 fn type_to_typeinfo(ty: Spanned<Type>) -> Spanned<TypeInfo> {
     (
         match ty.0 {
-            Type::Num => TypeInfo::Num,
+            Type::Int => TypeInfo::Int,
             Type::Bool => TypeInfo::Bool,
             Type::Unit => TypeInfo::Unit,
         },
@@ -470,8 +470,8 @@ impl<K: Eq + Hash, V> Scopes<K, V> {
 impl Type {
     fn get_prefix_type(&self, op: Spanned<PrefixOp>) -> Result<Type, Error> {
         match self {
-            Type::Num => match op.0 {
-                PrefixOp::Negate => Ok(Type::Num),
+            Type::Int => match op.0 {
+                PrefixOp::Negate => Ok(Type::Int),
             },
             Type::Bool | Type::Unit => Err(TypecheckError::CannotApplyUnaryOperator {
                 span: op.1,
@@ -486,8 +486,8 @@ impl Type {
         let lhs = self;
 
         match (lhs, rhs) {
-            (Type::Num, Type::Num) => match op.0 {
-                BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide => Ok(Type::Num),
+            (Type::Int, Type::Int) => match op.0 {
+                BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide => Ok(Type::Int),
                 BinOp::Equals
                 | BinOp::NotEquals
                 | BinOp::LessThan
@@ -537,7 +537,7 @@ impl Type {
 impl Literal {
     fn ty(&self) -> Type {
         match self {
-            Literal::Num(_) => Type::Num,
+            Literal::Int(_) => Type::Int,
             Literal::Bool(_) => Type::Bool,
             Literal::Unit => Type::Unit,
         }
