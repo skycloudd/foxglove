@@ -143,6 +143,13 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             ],
             |_| Statement::Error,
         )))
+        .recover_with(skip_then_retry_until(
+            any().ignored(),
+            just(Token::Control(Control::Semicolon))
+                .or(just(Token::Control(Control::RightCurly)))
+                .ignored()
+                .or(end()),
+        ))
         .map_with_span(|statement, span| (statement, span))
         .boxed()
     })
