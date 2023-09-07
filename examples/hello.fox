@@ -1,16 +1,16 @@
-let a = 123;
-let b = -456;
-let c = a + b;
+var a = 123;
+var b = -456;
+var c = a + b;
 
 print a; // 123
 print b; // -456
 print c; // -333
 
-let d = true;
-let e = d;
+var d = true;
+var e = d;
 
 {
-    let d = false;
+    var d = false;
     e = d;
     print d; // false
 }
@@ -18,7 +18,7 @@ let e = d;
 print d; // true
 print e; // false
 
-let f = 0;
+var f = 0;
 
 loop {
     print f; // 0, 1, 2, 3, 4
@@ -30,7 +30,7 @@ loop {
     }
 }
 
-let g = 0;
+var g = 0;
 
 while g < 5 {
     print g; // 0, 1, 2, 3, 4

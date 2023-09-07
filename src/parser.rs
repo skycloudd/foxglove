@@ -55,7 +55,7 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(Statement::Block)
             .boxed();
 
-        let let_ = just(Token::Keyword(Keyword::Let))
+        let let_ = just(Token::Keyword(Keyword::Var))
             .ignore_then(ident_parser())
             .then(
                 just(Token::Control(Control::Colon))

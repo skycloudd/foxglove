@@ -90,7 +90,7 @@ impl std::fmt::Display for Control {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Keyword {
     Print,
-    Let,
+    Var,
     True,
     False,
     Loop,
@@ -105,7 +105,7 @@ impl std::fmt::Display for Keyword {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Keyword::Print => write!(f, "print"),
-            Keyword::Let => write!(f, "let"),
+            Keyword::Var => write!(f, "var"),
             Keyword::True => write!(f, "true"),
             Keyword::False => write!(f, "false"),
             Keyword::Loop => write!(f, "loop"),

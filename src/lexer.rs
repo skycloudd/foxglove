@@ -42,7 +42,7 @@ pub fn lexer<'src>(
     let ident = text::ident()
         .map(|ident| match ident {
             "print" => Token::Keyword(Keyword::Print),
-            "let" => Token::Keyword(Keyword::Let),
+            "var" => Token::Keyword(Keyword::Var),
             "true" => Token::Keyword(Keyword::True),
             "false" => Token::Keyword(Keyword::False),
             "loop" => Token::Keyword(Keyword::Loop),
