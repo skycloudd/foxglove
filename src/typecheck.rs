@@ -35,7 +35,7 @@ impl<'a> Typechecker<'a> {
 
         for statement in ast.0.statements.0 {
             match self.typecheck_statement(statement) {
-                Ok(stmt) => statements.push(stmt),
+                Ok(stmt) => statements.push(stmt.0),
                 Err(err) => errors.push(err),
             }
         }
@@ -43,12 +43,7 @@ impl<'a> Typechecker<'a> {
         self.bindings.pop_scope();
 
         if errors.is_empty() {
-            Ok((
-                TypedAst {
-                    statements: (statements, ast.0.statements.1),
-                },
-                ast.1,
-            ))
+            Ok((TypedAst { statements }, ast.1))
         } else {
             Err(errors)
         }
@@ -64,7 +59,7 @@ impl<'a> Typechecker<'a> {
                 ast::Statement::Expr(expr) => {
                     let expr = self.typecheck_expr(expr)?;
 
-                    Statement::Expr(expr)
+                    Statement::Expr(expr.0)
                 }
                 ast::Statement::Block(statements) => {
                     self.bindings.push_scope();
@@ -73,11 +68,12 @@ impl<'a> Typechecker<'a> {
                         .0
                         .into_iter()
                         .map(|stmt| self.typecheck_statement(stmt))
+                        .map(|stmt| stmt.map(|stmt| stmt.0))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     self.bindings.pop_scope();
 
-                    Statement::Block((statements, stmt.1))
+                    Statement::Block(statements)
                 }
                 ast::Statement::Let { name, ty, value } => {
                     let value = self.typecheck_expr(value)?;
@@ -99,9 +95,9 @@ impl<'a> Typechecker<'a> {
                     self.bindings.insert(name.0, ty);
 
                     Statement::Let {
-                        name,
-                        ty: self.engine.reconstruct(ty)?,
-                        value,
+                        name: name.0,
+                        ty: self.engine.reconstruct(ty)?.0,
+                        value: value.0,
                     }
                 }
                 ast::Statement::Assign { name, value } => {
@@ -118,7 +114,10 @@ impl<'a> Typechecker<'a> {
 
                     self.engine.unify(value_ty, *ty)?;
 
-                    Statement::Assign { name, value }
+                    Statement::Assign {
+                        name: name.0,
+                        value: value.0,
+                    }
                 }
                 ast::Statement::Print(expr) => {
                     let expr = match expr {
@@ -134,12 +133,12 @@ impl<'a> Typechecker<'a> {
 
                     let expr = self.typecheck_expr(expr)?;
 
-                    Statement::Print(expr)
+                    Statement::Print(expr.0)
                 }
                 ast::Statement::Loop(stmt) => {
                     let stmt = self.typecheck_statement(*stmt)?;
 
-                    Statement::Loop(Box::new(stmt))
+                    Statement::Loop(Box::new(stmt.0))
                 }
                 ast::Statement::Continue => Statement::Continue,
                 ast::Statement::Break => Statement::Break,
@@ -164,14 +163,14 @@ impl<'a> Typechecker<'a> {
                         Some(otherwise) => {
                             let otherwise = self.typecheck_statement(*otherwise)?;
 
-                            Some(Box::new(otherwise))
+                            Some(Box::new(otherwise.0))
                         }
                         None => None,
                     };
 
                     Statement::Conditional {
-                        condition,
-                        then: Box::new(then),
+                        condition: condition.0,
+                        then: Box::new(then.0),
                         otherwise,
                     }
                 }
@@ -189,14 +188,11 @@ impl<'a> Typechecker<'a> {
 
                     let body = self.typecheck_statement(*body)?;
 
-                    Statement::Loop(Box::new((
-                        Statement::Conditional {
-                            condition: condition.clone(),
-                            then: Box::new(body.clone()),
-                            otherwise: Some(Box::new((Statement::Break, body.1))),
-                        },
-                        condition.1,
-                    )))
+                    Statement::Loop(Box::new(Statement::Conditional {
+                        condition: condition.0,
+                        then: Box::new(body.0),
+                        otherwise: Some(Box::new(Statement::Break)),
+                    }))
                 }
             },
             stmt.1,
@@ -223,7 +219,7 @@ impl<'a> Typechecker<'a> {
                             })?;
 
                     Expr {
-                        expr: ExprKind::Var(name),
+                        expr: ExprKind::Var(name.0),
                         ty: self.engine.reconstruct(*ty)?.0,
                     }
                 }
@@ -231,7 +227,7 @@ impl<'a> Typechecker<'a> {
                     let literal = self.lower_literal(literal);
 
                     Expr {
-                        expr: ExprKind::Literal(literal),
+                        expr: ExprKind::Literal(literal.0),
                         ty: literal.0.ty(),
                     }
                 }
@@ -246,8 +242,8 @@ impl<'a> Typechecker<'a> {
 
                     Expr {
                         expr: ExprKind::Prefix {
-                            op,
-                            expr: Box::new(expr),
+                            op: op.0,
+                            expr: Box::new(expr.0),
                         },
                         ty,
                     }
@@ -270,9 +266,9 @@ impl<'a> Typechecker<'a> {
 
                     Expr {
                         expr: ExprKind::Binary {
-                            op,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
+                            op: op.0,
+                            lhs: Box::new(lhs.0),
+                            rhs: Box::new(rhs.0),
                         },
                         ty,
                     }

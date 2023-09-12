@@ -1,8 +1,7 @@
 use crate::typecheck::Scopes;
 use crate::typed_ast::*;
-use crate::Spanned;
 
-pub fn interpret(ast: Spanned<TypedAst>) -> Result<(), String> {
+pub fn interpret(ast: TypedAst) -> Result<(), String> {
     let mut interpreter = Interpreter::new();
 
     interpreter.interpret_ast(ast)
@@ -19,19 +18,16 @@ impl<'src> Interpreter<'src> {
         }
     }
 
-    fn interpret_ast(&mut self, ast: Spanned<TypedAst<'src>>) -> Result<(), String> {
-        for statement in ast.0.statements.0 {
+    fn interpret_ast(&mut self, ast: TypedAst<'src>) -> Result<(), String> {
+        for statement in ast.statements {
             self.interpret_statement(statement)?;
         }
 
         Ok(())
     }
 
-    fn interpret_statement(
-        &mut self,
-        statement: Spanned<Statement<'src>>,
-    ) -> Result<ControlFlow, String> {
-        match statement.0 {
+    fn interpret_statement(&mut self, statement: Statement<'src>) -> Result<ControlFlow, String> {
+        match statement {
             Statement::Error => unreachable!(),
             Statement::Expr(expr) => {
                 let _ = self.interpret_expr(expr)?;
@@ -41,7 +37,7 @@ impl<'src> Interpreter<'src> {
             Statement::Block(statements) => {
                 self.vars.push_scope();
 
-                for statement in statements.0 {
+                for statement in statements {
                     match self.interpret_statement(statement)? {
                         ControlFlow::Normal => (),
                         cf @ (ControlFlow::Break | ControlFlow::Continue) => return Ok(cf),
@@ -55,14 +51,14 @@ impl<'src> Interpreter<'src> {
             Statement::Let { name, ty: _, value } => {
                 let value = self.interpret_expr(value)?;
 
-                self.vars.insert(name.0, value);
+                self.vars.insert(name, value);
 
                 Ok(ControlFlow::Normal)
             }
             Statement::Assign { name, value } => {
                 let value = self.interpret_expr(value)?;
 
-                let var = self.vars.get_mut(&name.0).unwrap();
+                let var = self.vars.get_mut(&name).unwrap();
 
                 *var = value;
 
@@ -112,11 +108,11 @@ impl<'src> Interpreter<'src> {
         }
     }
 
-    fn interpret_expr(&self, expr: Spanned<Expr>) -> Result<Value, String> {
-        match expr.0.expr {
+    fn interpret_expr(&self, expr: Expr) -> Result<Value, String> {
+        match expr.expr {
             ExprKind::Error => unreachable!(),
-            ExprKind::Var(name) => Ok(self.vars.get(&name.0).unwrap().clone()),
-            ExprKind::Literal(literal) => Ok(match literal.0 {
+            ExprKind::Var(name) => Ok(self.vars.get(&name).unwrap().clone()),
+            ExprKind::Literal(literal) => Ok(match literal {
                 Literal::Int(n) => Value::Int(n),
                 Literal::Bool(b) => Value::Bool(b),
                 Literal::Unit => Value::Unit,
@@ -124,7 +120,7 @@ impl<'src> Interpreter<'src> {
             ExprKind::Prefix { op, expr } => {
                 let value = self.interpret_expr(*expr)?;
 
-                match op.0 {
+                match op {
                     PrefixOp::Negate => match &value {
                         Value::Int(n) => Ok(Value::Int(-n)),
                         _ => unreachable!(),
@@ -136,7 +132,7 @@ impl<'src> Interpreter<'src> {
                 let rhs = self.interpret_expr(*rhs)?;
 
                 match (lhs, rhs) {
-                    (Value::Int(a), Value::Int(b)) => match op.0 {
+                    (Value::Int(a), Value::Int(b)) => match op {
                         BinOp::Add => Ok(Value::Int(a + b)),
                         BinOp::Subtract => Ok(Value::Int(a - b)),
                         BinOp::Multiply => Ok(Value::Int(a * b)),
@@ -149,7 +145,7 @@ impl<'src> Interpreter<'src> {
                         BinOp::GreaterThanOrEqual => Ok(Value::Bool(a >= b)),
                         _ => unreachable!(),
                     },
-                    (Value::Bool(a), Value::Bool(b)) => match op.0 {
+                    (Value::Bool(a), Value::Bool(b)) => match op {
                         BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide => {
                             unreachable!()
                         }
@@ -169,7 +165,7 @@ impl<'src> Interpreter<'src> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Value {
     Int(i32),
     Bool(bool),

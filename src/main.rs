@@ -26,7 +26,7 @@ fn main() {
             let input = read_to_string(filename).unwrap();
 
             match run(&input) {
-                Ok(typed_ast) => match interpreter::interpret(typed_ast) {
+                Ok(typed_ast) => match interpreter::interpret(typed_ast.0) {
                     Ok(_) => (),
                     Err(e) => {
                         eprintln!("runtime error: {}", e);
@@ -46,7 +46,7 @@ fn main() {
 
                 match run(&input) {
                     Ok(typed_ast) => {
-                        todo!("compile: {:?}", typed_ast)
+                        todo!("compile: {:?}", typed_ast);
                     }
                     Err(e) => {
                         print_errors(e, &input);

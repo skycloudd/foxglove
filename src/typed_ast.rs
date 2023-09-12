@@ -1,32 +1,30 @@
-use crate::Spanned;
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedAst<'src> {
-    pub statements: s!(Vec<s!(Statement<'src>)>),
+    pub statements: Vec<Statement<'src>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement<'src> {
     Error,
-    Expr(s!(Expr<'src>)),
-    Block(s!(Vec<s!(Statement<'src>)>)),
+    Expr(Expr<'src>),
+    Block(Vec<Statement<'src>>),
     Let {
-        name: s!(&'src str),
-        ty: s!(Type),
-        value: s!(Expr<'src>),
+        name: &'src str,
+        ty: Type,
+        value: Expr<'src>,
     },
     Assign {
-        name: s!(&'src str),
-        value: s!(Expr<'src>),
+        name: &'src str,
+        value: Expr<'src>,
     },
-    Print(s!(Expr<'src>)),
-    Loop(Box<s!(Statement<'src>)>),
+    Print(Expr<'src>),
+    Loop(Box<Statement<'src>>),
     Continue,
     Break,
     Conditional {
-        condition: s!(Expr<'src>),
-        then: Box<s!(Statement<'src>)>,
-        otherwise: Option<Box<s!(Statement<'src>)>>,
+        condition: Expr<'src>,
+        then: Box<Statement<'src>>,
+        otherwise: Option<Box<Statement<'src>>>,
     },
 }
 
@@ -46,16 +44,16 @@ pub struct Expr<'src> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind<'src> {
     Error,
-    Var(s!(&'src str)),
-    Literal(s!(Literal)),
+    Var(&'src str),
+    Literal(Literal),
     Prefix {
-        op: s!(PrefixOp),
-        expr: Box<s!(Expr<'src>)>,
+        op: PrefixOp,
+        expr: Box<Expr<'src>>,
     },
     Binary {
-        op: s!(BinOp),
-        lhs: Box<s!(Expr<'src>)>,
-        rhs: Box<s!(Expr<'src>)>,
+        op: BinOp,
+        lhs: Box<Expr<'src>>,
+        rhs: Box<Expr<'src>>,
     },
 }
 
@@ -113,11 +111,3 @@ impl std::fmt::Display for BinOp {
         }
     }
 }
-
-macro_rules! s {
-    ($e:ty) => {
-        Spanned<$e>
-    };
-}
-
-use s;
