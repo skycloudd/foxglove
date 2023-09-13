@@ -1,2 +1,14 @@
-var a = -34 + 35;
-a + 1;
+func fib(n: int): int {
+    if n <= 1 {
+        return n;
+    }
+
+    var a = fib(n - 1);
+    var b = fib(n - 2);
+
+    return a + b;
+}
+
+func main(): # {
+    print fib(10);
+}

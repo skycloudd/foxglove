@@ -84,6 +84,8 @@ impl Error {
                 TypecheckError::MainFunctionHasParameters { .. } => 9,
                 TypecheckError::MainFunctionHasWrongReturnType { .. } => 10,
                 TypecheckError::MissingMainFunction(_) => 11,
+                TypecheckError::ContinueOutsideOfLoop(_) => 12,
+                TypecheckError::BreakOutsideOfLoop(_) => 13,
             },
             Error::ExpectedFound { .. } => 1,
             Error::Custom(_, _) => 0,
@@ -136,6 +138,8 @@ pub enum TypecheckError {
         found: Type,
     },
     MissingMainFunction(Span),
+    ContinueOutsideOfLoop(Span),
+    BreakOutsideOfLoop(Span),
 }
 
 impl TypecheckError {
@@ -279,6 +283,19 @@ impl TypecheckError {
             TypecheckError::MissingMainFunction(span) => (
                 "Missing main function".to_string(),
                 vec![(("Missing main function".to_string(), Color::Yellow), *span)],
+                None,
+            ),
+            TypecheckError::ContinueOutsideOfLoop(span) => (
+                "Continue statement outside of a loop".to_string(),
+                vec![(
+                    ("Continue outside of loop".to_string(), Color::Yellow),
+                    *span,
+                )],
+                None,
+            ),
+            TypecheckError::BreakOutsideOfLoop(span) => (
+                "Break statement outside of a loop".to_string(),
+                vec![(("Break outside of loop".to_string(), Color::Yellow), *span)],
                 None,
             ),
         }

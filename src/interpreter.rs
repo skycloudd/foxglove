@@ -2,10 +2,10 @@ use crate::typecheck::Scopes;
 use crate::typed_ast::*;
 use rustc_hash::FxHashMap;
 
-pub fn interpret(ast: TypedAst) -> Result<(), String> {
+pub fn interpret(ast: TypedAst) {
     let mut interpreter = Interpreter::new();
 
-    interpreter.interpret_ast(ast)
+    interpreter.interpret_ast(ast);
 }
 
 struct Interpreter<'src> {
@@ -21,20 +21,38 @@ impl<'src> Interpreter<'src> {
         }
     }
 
-    fn interpret_ast(&mut self, ast: TypedAst<'src>) -> Result<(), String> {
+    fn interpret_ast(&mut self, ast: TypedAst<'src>) {
         self.fns = ast.functions;
 
         let main = self.fns.get("main").unwrap().clone();
 
-        match self.interpret_statement(&main.body) {
-            ControlFlow::Normal => Ok(()),
-            ControlFlow::Continue => Err("unexpected continue".to_string()),
-            ControlFlow::Break => Err("unexpected break".to_string()),
-            ControlFlow::Return(_) => Err("unexpected return".to_string()),
-        }
+        self.interpret_function(main, vec![]);
     }
 
-    fn interpret_statement(&mut self, statement: &Statement<'src>) -> ControlFlow {
+    fn interpret_function(&mut self, func: Function<'src>, args: Vec<Value>) -> Value {
+        let before_vars = self.vars.clone();
+
+        self.vars = Scopes::new();
+
+        self.vars.push_scope();
+
+        for (param, arg) in func.params.iter().zip(args) {
+            self.vars.insert(param.name, arg);
+        }
+
+        let result = match self.interpret_statement(func.body) {
+            ControlFlow::Normal => Value::Unit,
+            ControlFlow::Continue => panic!("unexpected continue"),
+            ControlFlow::Break => panic!("unexpected break"),
+            ControlFlow::Return(value) => value,
+        };
+
+        self.vars = before_vars;
+
+        result
+    }
+
+    fn interpret_statement(&mut self, statement: Statement<'src>) -> ControlFlow {
         match statement {
             Statement::Error => unreachable!(),
             Statement::Expr(expr) => {
@@ -83,7 +101,7 @@ impl<'src> Interpreter<'src> {
             }
             Statement::Loop(body) => {
                 loop {
-                    match self.interpret_statement(body) {
+                    match self.interpret_statement(*body.clone()) {
                         ControlFlow::Normal => {}
                         ControlFlow::Continue => continue,
                         ControlFlow::Break => break,
@@ -108,14 +126,14 @@ impl<'src> Interpreter<'src> {
                 let condition = self.interpret_expr(condition);
 
                 if condition == Value::Bool(true) {
-                    match self.interpret_statement(then) {
+                    match self.interpret_statement(*then) {
                         ControlFlow::Normal => (),
                         cf @ (ControlFlow::Break
                         | ControlFlow::Continue
                         | ControlFlow::Return(_)) => return cf,
                     }
                 } else if let Some(otherwise) = otherwise {
-                    match self.interpret_statement(otherwise) {
+                    match self.interpret_statement(*otherwise) {
                         ControlFlow::Normal => (),
                         cf @ (ControlFlow::Break
                         | ControlFlow::Continue
@@ -128,17 +146,17 @@ impl<'src> Interpreter<'src> {
         }
     }
 
-    fn interpret_expr(&mut self, expr: &Expr) -> Value {
-        match &expr.expr {
+    fn interpret_expr(&mut self, expr: Expr) -> Value {
+        match expr.expr {
             ExprKind::Error => unreachable!(),
-            ExprKind::Var(name) => self.vars.get(&name).unwrap().clone(),
+            ExprKind::Var(name) => *self.vars.get(&name).unwrap(),
             ExprKind::Literal(literal) => match literal {
-                Literal::Int(n) => Value::Int(*n),
-                Literal::Bool(b) => Value::Bool(*b),
+                Literal::Int(n) => Value::Int(n),
+                Literal::Bool(b) => Value::Bool(b),
                 Literal::Unit => Value::Unit,
             },
             ExprKind::Prefix { op, expr } => {
-                let value = self.interpret_expr(&expr);
+                let value = self.interpret_expr(*expr);
 
                 match op {
                     PrefixOp::Negate => match &value {
@@ -148,8 +166,8 @@ impl<'src> Interpreter<'src> {
                 }
             }
             ExprKind::Binary { op, lhs, rhs } => {
-                let lhs = self.interpret_expr(&lhs);
-                let rhs = self.interpret_expr(&rhs);
+                let lhs = self.interpret_expr(*lhs);
+                let rhs = self.interpret_expr(*rhs);
 
                 match (lhs, rhs) {
                     (Value::Int(a), Value::Int(b)) => match op {
@@ -184,27 +202,12 @@ impl<'src> Interpreter<'src> {
             ExprKind::Call { name, args } => {
                 let args = args
                     .into_iter()
-                    .map(|arg| self.interpret_expr(&arg))
+                    .map(|arg| self.interpret_expr(arg))
                     .collect::<Vec<_>>();
 
                 let func = self.fns.get(name).unwrap().clone();
 
-                self.vars.push_scope();
-
-                for (param, arg) in func.params.iter().zip(args) {
-                    self.vars.insert(param.name, arg);
-                }
-
-                let result = match self.interpret_statement(&func.body) {
-                    ControlFlow::Normal => unreachable!(),
-                    ControlFlow::Continue => unreachable!(),
-                    ControlFlow::Break => unreachable!(),
-                    ControlFlow::Return(value) => value,
-                };
-
-                self.vars.pop_scope();
-
-                result
+                self.interpret_function(func, args)
             }
         }
     }

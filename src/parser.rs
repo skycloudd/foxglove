@@ -167,17 +167,8 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
 
         let if_ = just(Token::Keyword(Keyword::If))
             .ignore_then(expression_parser())
-            .then(statement.clone().delimited_by(
-                just(Token::Control(Control::LeftCurly)),
-                just(Token::Control(Control::RightCurly)),
-            ))
-            .then(
-                (just(Token::Keyword(Keyword::Else)).ignore_then(statement.clone().delimited_by(
-                    just(Token::Control(Control::LeftCurly)),
-                    just(Token::Control(Control::RightCurly)),
-                )))
-                .or_not(),
-            )
+            .then(statement.clone())
+            .then((just(Token::Keyword(Keyword::Else)).ignore_then(statement.clone())).or_not())
             .map(|((condition, then), otherwise)| Statement::Conditional {
                 condition,
                 then: Box::new(then),

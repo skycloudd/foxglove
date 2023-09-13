@@ -27,13 +27,7 @@ fn main() {
             let input = read_to_string(filename).unwrap();
 
             match run(&input) {
-                Ok(typed_ast) => match interpreter::interpret(typed_ast.0) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        eprintln!("runtime error: {}", e);
-                        std::process::exit(1);
-                    }
-                },
+                Ok(typed_ast) => interpreter::interpret(typed_ast.0),
                 Err(e) => {
                     print_errors(e, &input);
 
@@ -47,6 +41,8 @@ fn main() {
 
                 match run(&input) {
                     Ok(typed_ast) => {
+                        let jit = build_cranelift::Jit::new();
+
                         todo!("compile: {:?}", typed_ast);
                     }
                     Err(e) => {

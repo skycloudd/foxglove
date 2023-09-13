@@ -15,6 +15,8 @@ struct Typechecker<'a> {
     engine: Engine,
     fns: FxHashMap<&'a str, (Vec<TypeId>, TypeId)>,
     bindings: Scopes<&'a str, TypeId>,
+    current_fn: Option<&'a str>,
+    is_in_loop: bool,
 }
 
 impl<'a> Typechecker<'a> {
@@ -23,6 +25,8 @@ impl<'a> Typechecker<'a> {
             engine: Engine::new(),
             fns: FxHashMap::default(),
             bindings: Scopes::new(),
+            current_fn: None,
+            is_in_loop: false,
         }
     }
 
@@ -34,6 +38,8 @@ impl<'a> Typechecker<'a> {
         let mut errors = vec![];
 
         for function in ast.0.functions.0 {
+            self.current_fn = Some(function.0.name.0);
+
             match self.typecheck_function(function) {
                 Ok(function) => {
                     functions.insert(function.0.name, function.0);
@@ -41,6 +47,8 @@ impl<'a> Typechecker<'a> {
                 Err(err) => errors.push(err),
             }
         }
+
+        self.current_fn = None;
 
         if functions.get("main").is_none() {
             errors.push(TypecheckError::MissingMainFunction((ast.1.end..ast.1.end).into()).into());
@@ -192,19 +200,50 @@ impl<'a> Typechecker<'a> {
                     },
                 }),
                 ast::Statement::Loop(stmt) => {
+                    self.is_in_loop = true;
+
                     let stmt = self.typecheck_statement(*stmt)?;
+
+                    self.is_in_loop = false;
 
                     Statement::Loop(Box::new(stmt.0))
                 }
-                ast::Statement::Continue => Statement::Continue,
-                ast::Statement::Break => Statement::Break,
-                ast::Statement::Return(expr) => Statement::Return(match expr {
-                    Some(expr) => self.typecheck_expr(expr)?.0,
-                    None => Expr {
-                        expr: ExprKind::Literal(Literal::Unit),
-                        ty: Type::Unit,
-                    },
-                }),
+                ast::Statement::Continue => {
+                    if !self.is_in_loop {
+                        return Err(TypecheckError::ContinueOutsideOfLoop(stmt.1).into());
+                    } else {
+                        Statement::Continue
+                    }
+                }
+                ast::Statement::Break => {
+                    if !self.is_in_loop {
+                        return Err(TypecheckError::BreakOutsideOfLoop(stmt.1).into());
+                    } else {
+                        Statement::Break
+                    }
+                }
+                ast::Statement::Return(expr) => {
+                    let ret_expr = match expr {
+                        Some(expr) => self.typecheck_expr(expr)?,
+                        None => (
+                            Expr {
+                                expr: ExprKind::Literal(Literal::Unit),
+                                ty: Type::Unit,
+                            },
+                            stmt.1,
+                        ),
+                    };
+
+                    let ret_ty = self.fns.get(self.current_fn.unwrap()).unwrap().1;
+
+                    let ret_expr_ty = self
+                        .engine
+                        .insert(type_to_typeinfo((ret_expr.0.ty, ret_expr.1)));
+
+                    self.engine.unify(ret_ty, ret_expr_ty)?;
+
+                    Statement::Return(ret_expr.0)
+                }
                 ast::Statement::Conditional {
                     condition,
                     then,

@@ -3,13 +3,13 @@ use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::Module;
 
-pub struct JIT {
+pub struct Jit {
     builder_ctx: FunctionBuilderContext,
     ctx: codegen::Context,
     module: JITModule,
 }
 
-impl JIT {
+impl Jit {
     pub fn new() -> Self {
         let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
             panic!("host machine is not supported: {}", msg);
@@ -30,17 +30,3 @@ impl JIT {
         }
     }
 }
-
-impl From<typed_ast::Type> for types::Type {
-    fn from(ty: typed_ast::Type) -> Self {
-        match ty {
-            typed_ast::Type::Int => INT_TYPE,
-            typed_ast::Type::Bool => BOOL_TYPE,
-            typed_ast::Type::Unit => UNIT_TYPE,
-        }
-    }
-}
-
-const INT_TYPE: types::Type = types::I32;
-const BOOL_TYPE: types::Type = types::I8;
-const UNIT_TYPE: types::Type = types::I8;
