@@ -1,7 +1,9 @@
-var counter = 0;
+func main(): # {
+    var counter = 0;
 
-while counter < 1000000 {
-    counter = counter + 1;
+    while counter < 1000000 {
+        counter = counter + 1;
+    }
+
+    print counter;
 }
-
-print counter;

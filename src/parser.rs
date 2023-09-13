@@ -13,21 +13,84 @@ pub fn parser<'tokens, 'src: 'tokens>() -> impl Parser<
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
     program_parser()
-        .map_with_span(|statements, span| (Ast { statements }, span))
+        .map_with_span(|functions, span| (Ast { functions }, span))
         .boxed()
 }
 
 fn program_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
-    Spanned<Vec<Spanned<Statement<'src>>>>,
+    Spanned<Vec<Spanned<Function<'src>>>>,
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
-    statement_parser()
+    function_parser()
         .repeated()
         .collect()
         .then_ignore(end())
-        .map_with_span(|statements, span| (statements, span))
+        .map_with_span(|functions, span| (functions, span))
+        .boxed()
+}
+
+fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    ParserInput<'tokens, 'src>,
+    Spanned<Function<'src>>,
+    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+> {
+    just(Token::Keyword(Keyword::Func))
+        .ignore_then(ident_parser())
+        .then(
+            param_parser()
+                .separated_by(just(Token::Control(Control::Comma)))
+                .allow_trailing()
+                .collect()
+                .delimited_by(
+                    just(Token::Control(Control::LeftParen)),
+                    just(Token::Control(Control::RightParen)),
+                )
+                .map_with_span(|params, span| (params, span))
+                .recover_with(via_parser(nested_delimiters(
+                    Token::Control(Control::LeftParen),
+                    Token::Control(Control::RightParen),
+                    [
+                        (
+                            Token::Control(Control::LeftCurly),
+                            Token::Control(Control::RightCurly),
+                        ),
+                        (
+                            Token::Control(Control::LeftSquare),
+                            Token::Control(Control::RightSquare),
+                        ),
+                    ],
+                    |span| (vec![], span),
+                ))),
+        )
+        .then_ignore(just(Token::Control(Control::Colon)))
+        .then(type_parser())
+        .then(statement_parser())
+        .map_with_span(|(((name, params), ty), body), span| {
+            (
+                Function {
+                    name,
+                    params,
+                    ty,
+                    body,
+                },
+                span,
+            )
+        })
+}
+
+fn param_parser<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    ParserInput<'tokens, 'src>,
+    Spanned<Param<'src>>,
+    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+> {
+    ident_parser()
+        .then_ignore(just(Token::Control(Control::Colon)))
+        .then(type_parser())
+        .map_with_span(|(name, ty), span| (Param { name, ty }, span))
         .boxed()
 }
 
@@ -96,6 +159,12 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(|_| Statement::Break)
             .boxed();
 
+        let return_ = just(Token::Keyword(Keyword::Return))
+            .ignore_then(expression_parser().or_not())
+            .then_ignore(just(Token::Control(Control::Semicolon)))
+            .map(Statement::Return)
+            .boxed();
+
         let if_ = just(Token::Keyword(Keyword::If))
             .ignore_then(expression_parser())
             .then(statement.clone().delimited_by(
@@ -126,7 +195,7 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         choice((
-            expr, block, let_, assign, print, loop_, continue_, break_, if_, while_,
+            expr, block, let_, assign, print, loop_, continue_, break_, return_, if_, while_,
         ))
         .recover_with(via_parser(nested_delimiters(
             Token::Control(Control::LeftCurly),
@@ -162,6 +231,23 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
     recursive(|expression| {
+        let call = ident_parser()
+            .then(
+                expression
+                    .clone()
+                    .separated_by(just(Token::Control(Control::Comma)))
+                    .allow_trailing()
+                    .collect()
+                    .delimited_by(
+                        just(Token::Control(Control::LeftParen)),
+                        just(Token::Control(Control::RightParen)),
+                    )
+                    .map_with_span(|args, span| (args, span)),
+            )
+            .map(|(name, args)| Expr::Call { name, args })
+            .map_with_span(|expr, span| (expr, span))
+            .boxed();
+
         let var = ident_parser()
             .map(Expr::Var)
             .map_with_span(|expr, span| (expr, span))
@@ -180,7 +266,7 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             )
             .boxed();
 
-        let atom = choice((var, literal, parenthesized_expr)).boxed();
+        let atom = choice((call, var, literal, parenthesized_expr)).boxed();
 
         let prefix_op = just(Token::Operator(Operator::Minus))
             .to(PrefixOp::Negate)
@@ -372,6 +458,7 @@ fn literal_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         Token::Int(n) => Literal::Int(n),
         Token::Keyword(Keyword::True) => Literal::Bool(true),
         Token::Keyword(Keyword::False) => Literal::Bool(false),
+        Token::Unit => Literal::Unit,
     }
     .map_with_span(|literal, span| (literal, span))
     .boxed()

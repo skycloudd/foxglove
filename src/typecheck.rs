@@ -13,6 +13,7 @@ pub fn typecheck(ast: Spanned<Ast>) -> Result<Spanned<TypedAst>, Vec<Error>> {
 
 struct Typechecker<'a> {
     engine: Engine,
+    fns: FxHashMap<&'a str, (Vec<TypeId>, TypeId)>,
     bindings: Scopes<&'a str, TypeId>,
 }
 
@@ -20,6 +21,7 @@ impl<'a> Typechecker<'a> {
     fn new() -> Self {
         Self {
             engine: Engine::new(),
+            fns: FxHashMap::default(),
             bindings: Scopes::new(),
         }
     }
@@ -28,25 +30,88 @@ impl<'a> Typechecker<'a> {
         &mut self,
         ast: Spanned<Ast<'src>>,
     ) -> Result<Spanned<TypedAst<'src>>, Vec<Error>> {
-        let mut statements = vec![];
+        let mut functions = FxHashMap::default();
         let mut errors = vec![];
 
-        self.bindings.push_scope();
-
-        for statement in ast.0.statements.0 {
-            match self.typecheck_statement(statement) {
-                Ok(stmt) => statements.push(stmt.0),
+        for function in ast.0.functions.0 {
+            match self.typecheck_function(function) {
+                Ok(function) => {
+                    functions.insert(function.0.name, function.0);
+                }
                 Err(err) => errors.push(err),
             }
         }
 
-        self.bindings.pop_scope();
+        if functions.get("main").is_none() {
+            errors.push(TypecheckError::MissingMainFunction((ast.1.end..ast.1.end).into()).into());
+        }
 
         if errors.is_empty() {
-            Ok((TypedAst { statements }, ast.1))
+            Ok((TypedAst { functions }, ast.1))
         } else {
             Err(errors)
         }
+    }
+
+    fn typecheck_function<'src: 'a>(
+        &mut self,
+        function: Spanned<ast::Function<'src>>,
+    ) -> Result<Spanned<Function<'src>>, Error> {
+        self.bindings.push_scope();
+
+        let mut params = vec![];
+        let mut param_types = vec![];
+
+        for param in &function.0.params.0 {
+            let ty = self.lower_type(param.0.ty);
+            let ty_id = self.engine.insert(type_to_typeinfo(ty));
+
+            param_types.push(ty_id);
+
+            self.bindings.insert(param.0.name.0, ty_id);
+
+            params.push(Param {
+                name: param.0.name.0,
+                ty: ty.0,
+            });
+        }
+
+        let ret_ty_type = self.lower_type(function.0.ty);
+        let ret_ty = self.engine.insert(type_to_typeinfo(ret_ty_type));
+
+        if function.0.name.0 == "main" {
+            if !param_types.is_empty() {
+                return Err(TypecheckError::MainFunctionHasParameters {
+                    span: function.0.params.1,
+                }
+                .into());
+            }
+
+            if ret_ty_type.0 != Type::Unit {
+                return Err(TypecheckError::MainFunctionHasWrongReturnType {
+                    span: function.0.ty.1,
+                    expected: Type::Unit,
+                    found: ret_ty_type.0,
+                }
+                .into());
+            }
+        }
+
+        self.fns.insert(function.0.name.0, (param_types, ret_ty));
+
+        let body = self.typecheck_statement(function.0.body)?;
+
+        self.bindings.pop_scope();
+
+        Ok((
+            Function {
+                name: function.0.name.0,
+                params,
+                ty: ret_ty_type.0,
+                body: body.0,
+            },
+            function.1,
+        ))
     }
 
     fn typecheck_statement<'src: 'a>(
@@ -119,22 +184,13 @@ impl<'a> Typechecker<'a> {
                         value: value.0,
                     }
                 }
-                ast::Statement::Print(expr) => {
-                    let expr = match expr {
-                        Some(expr) => expr,
-                        None => (
-                            ast::Expr::Literal((
-                                ast::Literal::Unit,
-                                (stmt.1.end..stmt.1.end).into(),
-                            )),
-                            (stmt.1.end..stmt.1.end).into(),
-                        ),
-                    };
-
-                    let expr = self.typecheck_expr(expr)?;
-
-                    Statement::Print(expr.0)
-                }
+                ast::Statement::Print(expr) => Statement::Print(match expr {
+                    Some(expr) => self.typecheck_expr(expr)?.0,
+                    None => Expr {
+                        expr: ExprKind::Literal(Literal::Unit),
+                        ty: Type::Unit,
+                    },
+                }),
                 ast::Statement::Loop(stmt) => {
                     let stmt = self.typecheck_statement(*stmt)?;
 
@@ -142,6 +198,13 @@ impl<'a> Typechecker<'a> {
                 }
                 ast::Statement::Continue => Statement::Continue,
                 ast::Statement::Break => Statement::Break,
+                ast::Statement::Return(expr) => Statement::Return(match expr {
+                    Some(expr) => self.typecheck_expr(expr)?.0,
+                    None => Expr {
+                        expr: ExprKind::Literal(Literal::Unit),
+                        ty: Type::Unit,
+                    },
+                }),
                 ast::Statement::Conditional {
                     condition,
                     then,
@@ -271,6 +334,46 @@ impl<'a> Typechecker<'a> {
                             rhs: Box::new(rhs.0),
                         },
                         ty,
+                    }
+                }
+                ast::Expr::Call { name, args } => {
+                    let args = args
+                        .0
+                        .into_iter()
+                        .map(|arg| self.typecheck_expr(arg))
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                    let (param_types, ret_ty) =
+                        self.fns
+                            .get(&name.0)
+                            .ok_or(TypecheckError::UndefinedFunction {
+                                name: name.0.to_string(),
+                                span: name.1,
+                            })?;
+
+                    if args.len() != param_types.len() {
+                        return Err(TypecheckError::IncorrectNumberOfArguments {
+                            span: name.1,
+                            expected: param_types.len(),
+                            found: args.len(),
+                        }
+                        .into());
+                    }
+
+                    for (arg, param_ty) in args.iter().zip(param_types.iter()) {
+                        let arg_id = self.engine.insert(type_to_typeinfo((arg.0.ty, arg.1)));
+
+                        self.engine.unify(arg_id, *param_ty)?;
+                    }
+
+                    let ret_ty = self.engine.reconstruct(*ret_ty)?;
+
+                    Expr {
+                        expr: ExprKind::Call {
+                            name: name.0,
+                            args: args.into_iter().map(|arg| arg.0).collect(),
+                        },
+                        ty: ret_ty.0,
                     }
                 }
             },
@@ -427,7 +530,7 @@ pub struct Scopes<K, V>(Vec<FxHashMap<K, V>>);
 
 impl<K: Eq + Hash, V> Scopes<K, V> {
     pub fn new() -> Scopes<K, V> {
-        Scopes(vec![FxHashMap::default()])
+        Scopes(vec![])
     }
 
     pub fn push_scope(&mut self) {

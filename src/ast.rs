@@ -2,7 +2,21 @@ use crate::Spanned;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ast<'src> {
-    pub statements: s!(Vec<s!(Statement<'src>)>),
+    pub functions: s!(Vec<s!(Function<'src>)>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Function<'src> {
+    pub name: s!(&'src str),
+    pub params: s!(Vec<s!(Param<'src>)>),
+    pub ty: s!(Type),
+    pub body: s!(Statement<'src>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Param<'src> {
+    pub name: s!(&'src str),
+    pub ty: s!(Type),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -23,6 +37,7 @@ pub enum Statement<'src> {
     Loop(Box<s!(Statement<'src>)>),
     Continue,
     Break,
+    Return(Option<s!(Expr<'src>)>),
     Conditional {
         condition: s!(Expr<'src>),
         then: Box<s!(Statement<'src>)>,
@@ -54,6 +69,10 @@ pub enum Expr<'src> {
         op: s!(BinOp),
         lhs: Box<s!(Expr<'src>)>,
         rhs: Box<s!(Expr<'src>)>,
+    },
+    Call {
+        name: s!(&'src str),
+        args: s!(Vec<s!(Expr<'src>)>),
     },
 }
 

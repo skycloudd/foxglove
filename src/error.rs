@@ -75,10 +75,15 @@ impl Error {
         match self {
             Error::Typecheck(e) => match e {
                 TypecheckError::UndefinedVariable { .. } => 2,
-                TypecheckError::CannotInferType { .. } => 3,
-                TypecheckError::TypeMismatch { .. } => 4,
-                TypecheckError::CannotApplyUnaryOperator { .. } => 5,
-                TypecheckError::CannotApplyBinaryOperator { .. } => 6,
+                TypecheckError::UndefinedFunction { .. } => 3,
+                TypecheckError::CannotInferType { .. } => 4,
+                TypecheckError::TypeMismatch { .. } => 5,
+                TypecheckError::CannotApplyUnaryOperator { .. } => 6,
+                TypecheckError::CannotApplyBinaryOperator { .. } => 7,
+                TypecheckError::IncorrectNumberOfArguments { .. } => 8,
+                TypecheckError::MainFunctionHasParameters { .. } => 9,
+                TypecheckError::MainFunctionHasWrongReturnType { .. } => 10,
+                TypecheckError::MissingMainFunction(_) => 11,
             },
             Error::ExpectedFound { .. } => 1,
             Error::Custom(_, _) => 0,
@@ -90,6 +95,10 @@ impl Error {
 #[derive(Clone, PartialEq)]
 pub enum TypecheckError {
     UndefinedVariable {
+        name: String,
+        span: Span,
+    },
+    UndefinedFunction {
         name: String,
         span: Span,
     },
@@ -113,6 +122,20 @@ pub enum TypecheckError {
         ty1: Type,
         ty2: Type,
     },
+    IncorrectNumberOfArguments {
+        span: Span,
+        expected: usize,
+        found: usize,
+    },
+    MainFunctionHasParameters {
+        span: Span,
+    },
+    MainFunctionHasWrongReturnType {
+        span: Span,
+        expected: Type,
+        found: Type,
+    },
+    MissingMainFunction(Span),
 }
 
 impl TypecheckError {
@@ -120,6 +143,14 @@ impl TypecheckError {
         match self {
             TypecheckError::UndefinedVariable { name, span } => (
                 format!("Undefined variable '{}'", name.fg(Color::Yellow)),
+                vec![(
+                    ("not found in this scope".to_string(), Color::Yellow),
+                    *span,
+                )],
+                None,
+            ),
+            TypecheckError::UndefinedFunction { name, span } => (
+                format!("Undefined function '{}'", name.fg(Color::Yellow)),
                 vec![(
                     ("not found in this scope".to_string(), Color::Yellow),
                     *span,
@@ -186,6 +217,68 @@ impl TypecheckError {
                     ),
                     *span,
                 )],
+                None,
+            ),
+            TypecheckError::IncorrectNumberOfArguments {
+                span,
+                expected,
+                found,
+            } => (
+                format!(
+                    "Incorrect number of arguments, expected {}, found {}",
+                    expected.fg(Color::Yellow),
+                    found.fg(Color::Yellow)
+                ),
+                vec![(
+                    (
+                        format!(
+                            "Incorrect number of arguments, expected {}, found {}",
+                            expected.fg(Color::Yellow),
+                            found.fg(Color::Yellow)
+                        ),
+                        Color::Yellow,
+                    ),
+                    *span,
+                )],
+                None,
+            ),
+            TypecheckError::MainFunctionHasParameters { span } => (
+                "Main function cannot have parameters".to_string(),
+                vec![(
+                    (
+                        "Main function cannot have parameters".to_string(),
+                        Color::Yellow,
+                    ),
+                    *span,
+                )],
+                None,
+            ),
+            TypecheckError::MainFunctionHasWrongReturnType {
+                span,
+                expected,
+                found,
+            } => (
+                format!(
+                    "Main function has wrong return type, expected '{}', found '{}'",
+                    format!("{:?}", expected).fg(Color::Yellow),
+                    format!("{:?}", found).fg(Color::Yellow)
+                ),
+                vec![(
+                    (
+                        format!(
+                            "Main function has wrong return type, expected '{}', found '{}'",
+                            format!("{:?}", expected).fg(Color::Yellow),
+                            format!("{:?}", found).fg(Color::Yellow)
+                        ),
+                        Color::Yellow,
+                    ),
+                    *span,
+                )],
+                None,
+            ),
+            TypecheckError::MissingMainFunction(span) => (
+                "Missing main function".to_string(),
+                vec![(("Missing main function".to_string(), Color::Yellow), *span)],
                 None,
             ),
         }

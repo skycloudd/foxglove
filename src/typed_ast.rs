@@ -1,6 +1,22 @@
+use rustc_hash::FxHashMap;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedAst<'src> {
-    pub statements: Vec<Statement<'src>>,
+    pub functions: FxHashMap<&'src str, Function<'src>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Function<'src> {
+    pub name: &'src str,
+    pub params: Vec<Param<'src>>,
+    pub ty: Type,
+    pub body: Statement<'src>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Param<'src> {
+    pub name: &'src str,
+    pub ty: Type,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -21,6 +37,7 @@ pub enum Statement<'src> {
     Loop(Box<Statement<'src>>),
     Continue,
     Break,
+    Return(Expr<'src>),
     Conditional {
         condition: Expr<'src>,
         then: Box<Statement<'src>>,
@@ -54,6 +71,10 @@ pub enum ExprKind<'src> {
         op: BinOp,
         lhs: Box<Expr<'src>>,
         rhs: Box<Expr<'src>>,
+    },
+    Call {
+        name: &'src str,
+        args: Vec<Expr<'src>>,
     },
 }
 
