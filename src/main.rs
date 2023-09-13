@@ -1,5 +1,6 @@
 #![warn(clippy::disallowed_types)] // prevent accidental use of std hashmaps which are slower
 
+use crate::build_cranelift::build_cranelift;
 use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
@@ -10,6 +11,7 @@ use std::path::PathBuf;
 use typed_ast::TypedAst;
 
 mod ast;
+mod build_cranelift;
 mod error;
 mod interpreter;
 mod lexer;
@@ -46,7 +48,9 @@ fn main() {
 
                 match run(&input) {
                     Ok(typed_ast) => {
-                        todo!("compile: {:?}", typed_ast);
+                        let cranelift_ir = build_cranelift(typed_ast.0);
+
+                        todo!("compile: {:?}", cranelift_ir);
                     }
                     Err(e) => {
                         print_errors(e, &input);
