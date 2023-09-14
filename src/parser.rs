@@ -65,15 +65,21 @@ fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
                     |span| (vec![], span),
                 ))),
         )
-        .then_ignore(just(Token::Control(Control::Colon)))
-        .then(type_parser())
+        .then(
+            just(Token::Control(Control::Colon))
+                .ignore_then(type_parser())
+                .or_not(),
+        )
         .then(statement_parser())
         .map_with_span(|(((name, params), ty), body), span| {
             (
                 Function {
                     name,
                     params,
-                    ty,
+                    ty: match ty {
+                        Some(ty) => ty,
+                        None => (Type::Unit, name.1),
+                    },
                     body,
                 },
                 span,

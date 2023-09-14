@@ -43,7 +43,7 @@ fn main() {
                     Ok(typed_ast) => {
                         let jit = build_cranelift::Jit::new();
 
-                        todo!("compile: {:?}", typed_ast);
+                        todo!("compile: {:#?}", typed_ast.0);
                     }
                     Err(e) => {
                         print_errors(e, &input);

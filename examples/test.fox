@@ -9,6 +9,11 @@ func fib(n: int): int {
     return a + b;
 }
 
-func main(): # {
-    print fib(10);
+func main() {
+    var n = 1;
+    while n < 20 {
+        print n;
+        print fib(n);
+        n = n + 1;
+    }
 }
