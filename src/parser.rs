@@ -70,7 +70,17 @@ fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
                 .ignore_then(type_parser())
                 .or_not(),
         )
-        .then(statement_parser())
+        .then(
+            statement_parser()
+                .repeated()
+                .collect()
+                .delimited_by(
+                    just(Token::Control(Control::LeftCurly)),
+                    just(Token::Control(Control::RightCurly)),
+                )
+                .map_with_span(|statements, span| (statements, span))
+                .map_with_span(|body, span| (Statement::Block(body), span)),
+        )
         .map_with_span(|(((name, params), ty), body), span| {
             (
                 Function {
@@ -151,7 +161,11 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         let loop_ = just(Token::Keyword(Keyword::Loop))
-            .ignore_then(statement.clone())
+            .ignore_then(
+                block
+                    .clone()
+                    .map_with_span(|statements, span| (statements, span)),
+            )
             .map(|body| Statement::Loop(Box::new(body)))
             .boxed();
 
@@ -173,8 +187,19 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
 
         let if_ = just(Token::Keyword(Keyword::If))
             .ignore_then(expression_parser())
-            .then(statement.clone())
-            .then((just(Token::Keyword(Keyword::Else)).ignore_then(statement.clone())).or_not())
+            .then(
+                block
+                    .clone()
+                    .map_with_span(|statements, span| (statements, span)),
+            )
+            .then(
+                (just(Token::Keyword(Keyword::Else)).ignore_then(
+                    block
+                        .clone()
+                        .map_with_span(|statements, span| (statements, span)),
+                ))
+                .or_not(),
+            )
             .map(|((condition, then), otherwise)| Statement::Conditional {
                 condition,
                 then: Box::new(then),

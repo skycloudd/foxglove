@@ -12,8 +12,7 @@ func fib(n: int): int {
 func main() {
     var n = 1;
     while n < 20 {
-        print n;
-        print fib(n);
+        print(fib(n));
         n = n + 1;
     }
 }
