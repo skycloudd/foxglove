@@ -1,5 +1,5 @@
 func add(a: int, b: int): int {
-    return a + b;
+    a + b
 }
 
 func fib(n: int): int {
@@ -7,7 +7,7 @@ func fib(n: int): int {
         return n;
     }
 
-    return fib(n - 1) + fib(n - 2);
+    fib(n - 1) + fib(n - 2)
 }
 
 func main() {

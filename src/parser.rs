@@ -71,17 +71,29 @@ fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
                 .or_not(),
         )
         .then(
-            statement_parser()
+            (statement_parser()
                 .repeated()
                 .collect()
-                .delimited_by(
-                    just(Token::Control(Control::LeftCurly)),
-                    just(Token::Control(Control::RightCurly)),
-                )
-                .map_with_span(|statements, span| (statements, span))
-                .map_with_span(|body, span| (Statement::Block(body), span)),
+                .map_with_span(|body: Vec<Spanned<Statement>>, span| (body, span))
+                .then(expression_parser().or_not()))
+            .delimited_by(
+                just(Token::Control(Control::LeftCurly)),
+                just(Token::Control(Control::RightCurly)),
+            ),
         )
-        .map_with_span(|(((name, params), ty), body), span| {
+        .map_with_span(|(((name, params), ty), (mut body, maybe_expr)), span| {
+            body.0.push(match maybe_expr {
+                Some(expr) => (Statement::Return(Some(expr.clone())), expr.1),
+                None => {
+                    let span = (body.1.end..body.1.end).into();
+
+                    (
+                        Statement::Return(Some((Expr::Literal((Literal::Unit, span)), span))),
+                        span,
+                    )
+                }
+            });
+
             (
                 Function {
                     name,

@@ -107,7 +107,14 @@ impl<'a> Typechecker<'a> {
 
         self.fns.insert(function.0.name.0, (param_types, ret_ty));
 
-        let body = self.typecheck_statement(function.0.body)?;
+        let body = function
+            .0
+            .body
+            .0
+            .into_iter()
+            .map(|stmt| self.typecheck_statement(stmt))
+            .map(|stmt| stmt.map(|stmt| stmt.0))
+            .collect::<Result<Vec<_>, _>>()?;
 
         self.bindings.pop_scope();
 
@@ -116,7 +123,7 @@ impl<'a> Typechecker<'a> {
                 name: function.0.name.0,
                 params,
                 ty: ret_ty_type.0,
-                body: body.0,
+                body,
             },
             function.1,
         ))
@@ -512,6 +519,8 @@ impl Engine {
             (TypeInfo::Int, TypeInfo::Int) => Ok(()),
 
             (TypeInfo::Bool, TypeInfo::Bool) => Ok(()),
+
+            (TypeInfo::Unit, TypeInfo::Unit) => Ok(()),
 
             (a, b) => Err(TypecheckError::TypeMismatch {
                 span1: var_a.1,

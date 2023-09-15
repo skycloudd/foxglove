@@ -40,16 +40,24 @@ impl<'src> Interpreter<'src> {
             self.vars.insert(param.name, arg);
         }
 
-        let result = match self.interpret_statement(func.body) {
-            ControlFlow::Normal => Value::Unit,
-            ControlFlow::Continue => panic!("unexpected continue"),
-            ControlFlow::Break => panic!("unexpected break"),
-            ControlFlow::Return(value) => value,
-        };
+        let mut result = None;
+
+        for statement in func.body {
+            match self.interpret_statement(statement) {
+                ControlFlow::Normal => (),
+                ControlFlow::Continue => panic!("unexpected continue"),
+                ControlFlow::Break => panic!("unexpected break"),
+                ControlFlow::Return(value) => {
+                    result = Some(value);
+
+                    break;
+                }
+            }
+        }
 
         self.vars = before_vars;
 
-        result
+        result.unwrap()
     }
 
     fn interpret_statement(&mut self, statement: Statement<'src>) -> ControlFlow {

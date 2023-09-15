@@ -5,12 +5,15 @@ use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
 use chumsky::Parser as _;
 use clap::{Parser, Subcommand};
+use create_cfg::convert_functions;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use typed_ast::TypedAst;
 
 mod ast;
 mod build_cranelift;
+mod cfg;
+mod create_cfg;
 mod error;
 mod interpreter;
 mod lexer;
@@ -35,21 +38,25 @@ fn main() {
                 }
             }
         }
-        Command::Build { filenames } => {
-            for filename in filenames {
-                let input = read_to_string(&filename).unwrap();
+        Command::Jit { filename } => {
+            let input = read_to_string(filename).unwrap();
 
-                match run(&input) {
-                    Ok(typed_ast) => {
-                        let jit = build_cranelift::Jit::new();
+            match run(&input) {
+                Ok(typed_ast) => {
+                    let functions = convert_functions(typed_ast.0);
 
-                        todo!("compile: {:#?}", typed_ast.0);
-                    }
-                    Err(e) => {
-                        print_errors(e, &input);
+                    let mut jit = build_cranelift::Jit::new();
 
-                        continue;
-                    }
+                    let code = jit.compile(functions);
+
+                    let jit_main: extern "C" fn() = unsafe { std::mem::transmute(code) };
+
+                    jit_main();
+                }
+                Err(e) => {
+                    print_errors(e, &input);
+
+                    std::process::exit(1);
                 }
             }
         }
@@ -66,7 +73,7 @@ struct Args {
 #[derive(Subcommand)]
 enum Command {
     Run { filename: PathBuf },
-    Build { filenames: Vec<PathBuf> },
+    Jit { filename: PathBuf },
 }
 
 fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {

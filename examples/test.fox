@@ -6,7 +6,7 @@ func fib(n: int): int {
     var a = fib(n - 1);
     var b = fib(n - 2);
 
-    return a + b;
+    a + b
 }
 
 func main() {

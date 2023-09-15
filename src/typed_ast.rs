@@ -10,7 +10,7 @@ pub struct Function<'src> {
     pub name: &'src str,
     pub params: Vec<Param<'src>>,
     pub ty: Type,
-    pub body: Statement<'src>,
+    pub body: Vec<Statement<'src>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
