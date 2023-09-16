@@ -151,16 +151,14 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                 self.builder.seal_block(then_block);
                 self.builder.seal_block(otherwise_block);
 
-                self.builder.switch_to_block(then_block);
-
-                self.translate_bb(self.graph[then].clone());
-
-                self.builder.switch_to_block(otherwise_block);
-
-                self.translate_bb(self.graph[otherwise].clone());
-
                 let join_block = self.builder.create_block();
 
+                self.builder.switch_to_block(then_block);
+                self.translate_bb(self.graph[then].clone());
+                self.builder.ins().jump(join_block, &[]);
+
+                self.builder.switch_to_block(otherwise_block);
+                self.translate_bb(self.graph[otherwise].clone());
                 self.builder.ins().jump(join_block, &[]);
 
                 self.builder.seal_block(join_block);
