@@ -602,16 +602,6 @@ impl<K: Eq + Hash, V> Scopes<K, V> {
 
         None
     }
-
-    pub fn get_mut(&mut self, k: &K) -> Option<&mut V> {
-        for scope in self.0.iter_mut().rev() {
-            if let Some(v) = scope.get_mut(k) {
-                return Some(v);
-            }
-        }
-
-        None
-    }
 }
 
 impl Type {

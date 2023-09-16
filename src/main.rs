@@ -12,12 +12,23 @@ use typed_ast::TypedAst;
 mod ast;
 mod build_cranelift;
 mod error;
-mod interpreter;
 mod lexer;
 mod parser;
 mod token;
 mod typecheck;
 mod typed_ast;
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    Run { filename: PathBuf },
+}
 
 fn main() {
     let args = Args::parse();
@@ -27,28 +38,8 @@ fn main() {
             let input = read_to_string(filename).unwrap();
 
             match run(&input) {
-                Ok(typed_ast) => interpreter::interpret(typed_ast.0),
-                Err(e) => {
-                    print_errors(e, &input);
-
-                    std::process::exit(1);
-                }
-            }
-        }
-        Command::Jit { filename } => {
-            let input = read_to_string(filename).unwrap();
-
-            match run(&input) {
-                Ok(typed_ast) => {
-                    let mut jit = build_cranelift::Jit::new();
-
-                    let code = jit.compile(typed_ast.0);
-
-                    let jit_main: extern "C" fn() -> i32 = unsafe { std::mem::transmute(code) };
-
-                    eprintln!("... running main()");
-
-                    let exit_code = jit_main();
+                Ok((typed_ast, _)) => {
+                    let exit_code = jit(typed_ast);
 
                     std::process::exit(exit_code);
                 }
@@ -62,44 +53,24 @@ fn main() {
     }
 }
 
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Args {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    Run { filename: PathBuf },
-    Jit { filename: PathBuf },
-}
-
 fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
     let (tokens, lex_errs) = lexer::lexer().parse(input).into_output_errors();
 
-    // dbg!(&tokens);
+    let (ast, parse_errs) = tokens
+        .as_ref()
+        .map(|tokens| {
+            parser::parser()
+                .parse(tokens.spanned((input.len()..input.len()).into()))
+                .into_output_errors()
+        })
+        .unwrap_or((None, vec![]));
 
-    let (ast, parse_errs) = if let Some(tokens) = &tokens {
-        parser::parser()
-            .parse(tokens.spanned((input.len()..input.len()).into()))
-            .into_output_errors()
-    } else {
-        (None, vec![])
-    };
-
-    // dbg!(&ast);
-
-    let (typed_ast, tc_errs) = if let Some(ast) = ast {
-        match typecheck::typecheck(ast) {
+    let (typed_ast, tc_errs) = ast
+        .map(|ast| match typecheck::typecheck(ast) {
             Ok(typed_ast) => (Some(typed_ast), vec![]),
             Err(tc_errs) => (None, tc_errs),
-        }
-    } else {
-        (None, vec![])
-    };
-
-    // dbg!(&typed_ast);
+        })
+        .unwrap_or((None, vec![]));
 
     let errs = Vec::new()
         .into_iter()
@@ -123,6 +94,16 @@ fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
     } else {
         Err(errs)
     }
+}
+
+fn jit(typed_ast: TypedAst) -> i32 {
+    let mut jit = build_cranelift::Jit::new();
+
+    let code = jit.compile(typed_ast);
+
+    let jit_main: extern "C" fn() -> i32 = unsafe { std::mem::transmute(code) };
+
+    jit_main()
 }
 
 pub type Span = SimpleSpan<usize>;
