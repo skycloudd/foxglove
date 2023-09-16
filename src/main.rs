@@ -99,7 +99,7 @@ fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
         (None, vec![])
     };
 
-    dbg!(&typed_ast);
+    // dbg!(&typed_ast);
 
     let errs = Vec::new()
         .into_iter()

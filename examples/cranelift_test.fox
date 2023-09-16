@@ -4,6 +4,8 @@ func test(cond: bool) {
     }
 }
 
-func main() {
+func main(): int {
     test(true);
+
+    0
 }

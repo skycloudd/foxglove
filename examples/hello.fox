@@ -52,4 +52,6 @@ func main() {
     }
 
     print fib(10); // 55
+
+    0
 }

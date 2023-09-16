@@ -35,7 +35,7 @@ impl Jit {
         let mut main_id = None;
 
         for (name, func) in typed_ast.functions {
-            println!("compiling function: {}", name);
+            // println!("compiling function: {}", name);
 
             for param in &func.params {
                 self.ctx
@@ -87,7 +87,7 @@ impl Jit {
                 main_id = Some(id);
             }
 
-            println!("{}", &self.ctx.func);
+            // println!("{}", &self.ctx.func);
 
             self.module.clear_context(&mut self.ctx);
         }
