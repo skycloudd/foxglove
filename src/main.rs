@@ -1,22 +1,20 @@
-#![warn(clippy::disallowed_types)] // prevent accidental use of std hashmaps which are slower
-
 use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
 use chumsky::Parser as _;
 use clap::{Parser, Subcommand};
+use codegen::cranelift::Jit;
+use lexer::lexer;
 use std::fs::read_to_string;
 use std::path::PathBuf;
-use typed_ast::TypedAst;
+use typechecker::typecheck;
+use typechecker::typed_ast::TypedAst;
 
-mod ast;
-mod build_cranelift;
+mod codegen;
 mod error;
 mod lexer;
 mod parser;
-mod token;
-mod typecheck;
-mod typed_ast;
+mod typechecker;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -54,7 +52,7 @@ fn main() {
 }
 
 fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
-    let (tokens, lex_errs) = lexer::lexer().parse(input).into_output_errors();
+    let (tokens, lex_errs) = lexer().parse(input).into_output_errors();
 
     let (ast, parse_errs) = tokens
         .as_ref()
@@ -66,7 +64,7 @@ fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
         .unwrap_or((None, vec![]));
 
     let (typed_ast, tc_errs) = ast
-        .map(|ast| match typecheck::typecheck(ast) {
+        .map(|ast| match typecheck(ast) {
             Ok(typed_ast) => (Some(typed_ast), vec![]),
             Err(tc_errs) => (None, tc_errs),
         })
@@ -97,7 +95,7 @@ fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
 }
 
 fn jit(typed_ast: TypedAst) -> i32 {
-    let mut jit = build_cranelift::Jit::new();
+    let mut jit = Jit::new();
 
     let code = jit.compile(typed_ast);
 

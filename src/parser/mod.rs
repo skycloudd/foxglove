@@ -1,8 +1,10 @@
-use crate::ast::*;
-use crate::token::{Control, Keyword, Operator, Token};
+use self::ast::*;
+use crate::lexer::token::{Control, Keyword, Operator, Token};
 use crate::{Span, Spanned};
 use chumsky::input::SpannedInput;
 use chumsky::prelude::*;
+
+pub mod ast;
 
 type ParserInput<'tokens, 'src> = SpannedInput<Token<'src>, Span, &'tokens [(Token<'src>, Span)]>;
 

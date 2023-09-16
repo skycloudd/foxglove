@@ -1,6 +1,8 @@
-use crate::token::*;
+use self::token::*;
 use crate::{Span, Spanned};
 use chumsky::prelude::*;
+
+pub mod token;
 
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {

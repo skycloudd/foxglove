@@ -1,8 +1,8 @@
-use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedAst<'src> {
-    pub functions: FxHashMap<&'src str, Function<'src>>,
+    pub functions: HashMap<&'src str, Function<'src>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -13,10 +13,17 @@ pub struct Function<'src> {
     pub body: Vec<Statement<'src>>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Param<'src> {
     pub name: &'src str,
     pub ty: Type,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Type {
+    Int,
+    Bool,
+    Unit,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -43,13 +50,6 @@ pub enum Statement<'src> {
         then: Box<Statement<'src>>,
         otherwise: Option<Box<Statement<'src>>>,
     },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Type {
-    Int,
-    Bool,
-    Unit,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -85,20 +85,24 @@ pub enum Literal {
     Unit,
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PrefixOp {
     Negate,
 }
 
 impl std::fmt::Display for PrefixOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PrefixOp::Negate => write!(f, "-"),
-        }
+        write!(
+            f,
+            "{}",
+            match self {
+                PrefixOp::Negate => "-",
+            }
+        )
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BinOp {
     Add,
     Subtract,
@@ -116,19 +120,23 @@ pub enum BinOp {
 
 impl std::fmt::Display for BinOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BinOp::Add => write!(f, "+"),
-            BinOp::Subtract => write!(f, "-"),
-            BinOp::Multiply => write!(f, "*"),
-            BinOp::Divide => write!(f, "/"),
-            BinOp::Equals => write!(f, "=="),
-            BinOp::NotEquals => write!(f, "!="),
-            BinOp::LessThan => write!(f, "<"),
-            BinOp::LessThanOrEqual => write!(f, "<="),
-            BinOp::GreaterThan => write!(f, ">"),
-            BinOp::GreaterThanOrEqual => write!(f, ">="),
-            BinOp::LogicalAnd => write!(f, "&&"),
-            BinOp::LogicalOr => write!(f, "||"),
-        }
+        write!(
+            f,
+            "{}",
+            match self {
+                BinOp::Add => "+",
+                BinOp::Subtract => "-",
+                BinOp::Multiply => "*",
+                BinOp::Divide => "/",
+                BinOp::Equals => "==",
+                BinOp::NotEquals => "!=",
+                BinOp::LessThan => "<",
+                BinOp::LessThanOrEqual => "<=",
+                BinOp::GreaterThan => ">",
+                BinOp::GreaterThanOrEqual => ">=",
+                BinOp::LogicalAnd => "&&",
+                BinOp::LogicalOr => "||",
+            }
+        )
     }
 }

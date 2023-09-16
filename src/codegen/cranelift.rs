@@ -1,8 +1,8 @@
-use crate::typed_ast::{self, *};
+use crate::typechecker::typed_ast::{self, *};
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{Linkage, Module};
-use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 
 pub struct Jit {
     builder_ctx: FunctionBuilderContext,
@@ -64,7 +64,7 @@ impl Jit {
             let mut translator = FunctionTranslator {
                 builder,
                 module: &mut self.module,
-                vars: FxHashMap::default(),
+                vars: HashMap::new(),
                 var_index: 0,
                 loop_block: None,
                 loop_exit_block: None,
@@ -101,7 +101,7 @@ impl Jit {
 struct FunctionTranslator<'a, 'src: 'a> {
     builder: FunctionBuilder<'a>,
     module: &'a mut JITModule,
-    vars: FxHashMap<&'src str, Variable>,
+    vars: HashMap<&'src str, Variable>,
     var_index: usize,
     loop_block: Option<Block>,
     loop_exit_block: Option<Block>,

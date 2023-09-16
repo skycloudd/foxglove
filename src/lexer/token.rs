@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Token<'src> {
     Int(i32),
     Unit,
@@ -21,7 +21,7 @@ impl std::fmt::Display for Token<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Operator {
     Plus,
     Minus,
@@ -56,7 +56,7 @@ impl std::fmt::Display for Operator {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Control {
     Semicolon,
     Colon,
@@ -87,7 +87,7 @@ impl std::fmt::Display for Control {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Keyword {
     Print,
     Var,

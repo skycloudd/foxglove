@@ -1,9 +1,11 @@
-use crate::typecheck::TypeInfo;
-use crate::typed_ast::{BinOp, PrefixOp, Type};
+use crate::typechecker::{
+    typed_ast::{BinOp, PrefixOp, Type},
+    TypeInfo,
+};
 use crate::{Span, Spanned};
 use ariadne::{Color, Fmt};
 use chumsky::error::RichReason;
-use chumsky::prelude::Rich;
+use chumsky::prelude::*;
 
 #[derive(Clone, PartialEq)]
 pub enum Error {

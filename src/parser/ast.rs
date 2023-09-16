@@ -13,10 +13,17 @@ pub struct Function<'src> {
     pub body: s!(Vec<s!(Statement<'src>)>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Param<'src> {
     pub name: s!(&'src str),
     pub ty: s!(Type),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Type {
+    Int,
+    Bool,
+    Unit,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,13 +56,6 @@ pub enum Statement<'src> {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Type {
-    Int,
-    Bool,
-    Unit,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<'src> {
     Error,
@@ -83,12 +83,12 @@ pub enum Literal {
     Unit,
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PrefixOp {
     Negate,
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BinOp {
     Add,
     Subtract,

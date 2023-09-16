@@ -319,7 +319,6 @@ dependencies = [
  "cranelift-jit",
  "cranelift-module",
  "cranelift-native",
- "rustc-hash",
 ]
 
 [[package]]

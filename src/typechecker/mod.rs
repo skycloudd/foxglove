@@ -1,9 +1,11 @@
-use crate::ast::{self, Ast};
+use self::typed_ast::*;
 use crate::error::{Error, TypecheckError};
-use crate::typed_ast::*;
+use crate::parser::ast::{self, Ast};
 use crate::Spanned;
-use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 use std::hash::Hash;
+
+pub mod typed_ast;
 
 pub fn typecheck(ast: Spanned<Ast>) -> Result<Spanned<TypedAst>, Vec<Error>> {
     let mut checker = Typechecker::new();
@@ -13,7 +15,7 @@ pub fn typecheck(ast: Spanned<Ast>) -> Result<Spanned<TypedAst>, Vec<Error>> {
 
 struct Typechecker<'a> {
     engine: Engine,
-    fns: FxHashMap<&'a str, (Vec<TypeId>, TypeId)>,
+    fns: HashMap<&'a str, (Vec<TypeId>, TypeId)>,
     bindings: Scopes<&'a str, TypeId>,
     current_fn: Option<&'a str>,
     is_in_loop: bool,
@@ -23,7 +25,7 @@ impl<'a> Typechecker<'a> {
     fn new() -> Self {
         Self {
             engine: Engine::new(),
-            fns: FxHashMap::default(),
+            fns: HashMap::new(),
             bindings: Scopes::new(),
             current_fn: None,
             is_in_loop: false,
@@ -34,7 +36,7 @@ impl<'a> Typechecker<'a> {
         &mut self,
         ast: Spanned<Ast<'src>>,
     ) -> Result<Spanned<TypedAst<'src>>, Vec<Error>> {
-        let mut functions = FxHashMap::default();
+        let mut functions = HashMap::new();
         let mut errors = vec![];
 
         for function in ast.0.functions.0 {
@@ -481,14 +483,14 @@ impl<'a> Typechecker<'a> {
 
 struct Engine {
     id_counter: usize,
-    vars: FxHashMap<TypeId, Spanned<TypeInfo>>,
+    vars: HashMap<TypeId, Spanned<TypeInfo>>,
 }
 
 impl Engine {
     fn new() -> Self {
         Self {
             id_counter: 0,
-            vars: FxHashMap::default(),
+            vars: HashMap::new(),
         }
     }
 
@@ -574,7 +576,7 @@ fn type_to_typeinfo(ty: Spanned<Type>) -> Spanned<TypeInfo> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Scopes<K, V>(Vec<FxHashMap<K, V>>);
+pub struct Scopes<K, V>(Vec<HashMap<K, V>>);
 
 impl<K: Eq + Hash, V> Scopes<K, V> {
     pub fn new() -> Scopes<K, V> {
@@ -582,7 +584,7 @@ impl<K: Eq + Hash, V> Scopes<K, V> {
     }
 
     pub fn push_scope(&mut self) {
-        self.0.push(FxHashMap::default());
+        self.0.push(HashMap::new());
     }
 
     pub fn pop_scope(&mut self) {
