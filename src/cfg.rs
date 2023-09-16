@@ -1,5 +1,6 @@
-use petgraph::graph::{Graph, NodeIndex};
 use rustc_hash::FxHashMap;
+
+pub type NodeIndex = u32;
 
 #[derive(Clone, Debug)]
 pub struct Functions<'src> {
@@ -16,7 +17,7 @@ pub struct Function<'src> {
 
 #[derive(Clone, Debug)]
 pub struct Cfg<'src> {
-    pub graph: Graph<BasicBlock<'src>, ()>,
+    pub blocks: Vec<BasicBlock<'src>>,
     pub entry: NodeIndex,
 }
 

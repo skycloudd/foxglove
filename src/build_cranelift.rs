@@ -2,7 +2,6 @@ use crate::cfg::{self, *};
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{Linkage, Module};
-use petgraph::graph::{Graph, NodeIndex};
 use rustc_hash::FxHashMap;
 
 pub struct Jit {
@@ -63,7 +62,7 @@ impl Jit {
             let mut translator = FunctionTranslator {
                 builder,
                 module: &mut self.module,
-                graph: func.body.graph,
+                graph: func.body.blocks,
                 entry: func.body.entry,
                 vars: FxHashMap::default(),
                 var_index: 0,
@@ -99,7 +98,7 @@ impl Jit {
 struct FunctionTranslator<'a, 'src: 'a> {
     builder: FunctionBuilder<'a>,
     module: &'a mut JITModule,
-    graph: Graph<BasicBlock<'src>, ()>,
+    graph: Vec<BasicBlock<'src>>,
     entry: NodeIndex,
     vars: FxHashMap<&'src str, Variable>,
     var_index: usize,
@@ -107,7 +106,7 @@ struct FunctionTranslator<'a, 'src: 'a> {
 
 impl<'a, 'src> FunctionTranslator<'a, 'src> {
     fn translate_cfg(&mut self) {
-        let start_block = self.graph[self.entry].clone();
+        let start_block = self.graph[self.entry as usize].clone();
 
         self.translate_bb(start_block);
     }
@@ -132,7 +131,7 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
 
                 self.builder.switch_to_block(block);
 
-                self.translate_bb(self.graph[idx].clone());
+                self.translate_bb(self.graph[idx as usize].clone());
             }
             Terminator::Branch {
                 condition,
@@ -154,11 +153,11 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                 let join_block = self.builder.create_block();
 
                 self.builder.switch_to_block(then_block);
-                self.translate_bb(self.graph[then].clone());
+                self.translate_bb(self.graph[then as usize].clone());
                 self.builder.ins().jump(join_block, &[]);
 
                 self.builder.switch_to_block(otherwise_block);
-                self.translate_bb(self.graph[otherwise].clone());
+                self.translate_bb(self.graph[otherwise as usize].clone());
                 self.builder.ins().jump(join_block, &[]);
 
                 self.builder.seal_block(join_block);

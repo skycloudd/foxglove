@@ -15,7 +15,9 @@ pub fn convert_functions(typed_ast: TypedAst) -> Functions {
             })
             .collect();
 
-        let cfg = create_cfg(func.body);
+        let cfg_builder = CfgBuilder::new();
+
+        let cfg = cfg_builder.create_cfg(func.body);
 
         let function = Function {
             name,
@@ -30,8 +32,22 @@ pub fn convert_functions(typed_ast: TypedAst) -> Functions {
     Functions { functions }
 }
 
-pub fn create_cfg(statements: Vec<typed_ast::Statement>) -> Cfg {
-    todo!();
+struct CfgBuilder<'src> {
+    blocks: Vec<BasicBlock<'src>>,
+    current_block: NodeIndex,
+}
+
+impl<'src> CfgBuilder<'src> {
+    fn new() -> Self {
+        Self {
+            blocks: vec![],
+            current_block: 0,
+        }
+    }
+
+    fn create_cfg(self, statements: Vec<typed_ast::Statement>) -> Cfg {
+        todo!()
+    }
 }
 
 impl From<typed_ast::Type> for Type {
