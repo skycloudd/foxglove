@@ -1,0 +1,11 @@
+func fibonacci(n: int): int {
+    if n <= 1 {
+        return n;
+    }
+
+    fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+func main(): int {
+    fibonacci(10)
+}

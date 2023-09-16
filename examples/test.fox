@@ -1,3 +1,7 @@
+func add(a: int, b: int): int {
+    a + b
+}
+
 func fib(n: int): int {
     if n <= 1 {
         return n;
@@ -7,5 +11,47 @@ func fib(n: int): int {
 }
 
 func main(): int {
-    fib(10)
+    var a = 123;
+    var b = -456;
+    var c = add(a, b);
+
+    a; // 123
+    b; // -456
+    c; // -333
+
+    var d = true;
+    var e = d;
+
+    {
+        var d = false;
+        e = d;
+        d; // false
+    }
+
+    d; // true
+    e; // false
+
+    var f = 0;
+
+    loop {
+        f; // 0, 1, 2, 3, 4
+
+        f = add(f, 1);
+
+        if f >= 5 {
+            break;
+        }
+    }
+
+    var g = 0;
+
+    while g < 5 {
+        g; // 0, 1, 2, 3, 4
+
+        g = g + 1;
+    }
+
+    fib(10); // 55
+
+    0
 }
