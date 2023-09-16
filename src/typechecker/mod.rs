@@ -40,14 +40,14 @@ impl<'a> Typechecker<'a> {
         let mut errors = vec![];
 
         for function in ast.0.functions.0 {
-            self.current_fn = Some(function.0.name.0);
+            let name = function.0.name.0;
+            self.current_fn = Some(name);
 
-            match self.typecheck_function(function) {
-                Ok(function) => {
-                    functions.insert(function.0.name, function.0);
-                }
-                Err(err) => errors.push(err),
-            }
+            let (func, tc_errs) = self.typecheck_function(function);
+
+            functions.insert(name, func.0);
+
+            errors.extend(tc_errs);
         }
 
         self.current_fn = None;
@@ -66,7 +66,9 @@ impl<'a> Typechecker<'a> {
     fn typecheck_function<'src: 'a>(
         &mut self,
         function: Spanned<ast::Function<'src>>,
-    ) -> Result<Spanned<Function<'src>>, Error> {
+    ) -> (Spanned<Function<'src>>, Vec<Error>) {
+        let mut errors = vec![];
+
         self.bindings.push_scope();
 
         let mut params = vec![];
@@ -91,19 +93,23 @@ impl<'a> Typechecker<'a> {
 
         if function.0.name.0 == "main" {
             if !param_types.is_empty() {
-                return Err(TypecheckError::MainFunctionHasParameters {
-                    span: function.0.params.1,
-                }
-                .into());
+                errors.push(
+                    TypecheckError::MainFunctionHasParameters {
+                        span: function.0.params.1,
+                    }
+                    .into(),
+                );
             }
 
             if ret_ty_type.0 != Type::Int {
-                return Err(TypecheckError::MainFunctionHasWrongReturnType {
-                    span: function.0.ty.1,
-                    expected: Type::Int,
-                    found: ret_ty_type.0,
-                }
-                .into());
+                errors.push(
+                    TypecheckError::MainFunctionHasWrongReturnType {
+                        span: function.0.ty.1,
+                        expected: Type::Int,
+                        found: ret_ty_type.0,
+                    }
+                    .into(),
+                );
             }
         }
 
@@ -116,19 +122,26 @@ impl<'a> Typechecker<'a> {
             .into_iter()
             .map(|stmt| self.typecheck_statement(stmt))
             .map(|stmt| stmt.map(|stmt| stmt.0))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_else(|err| {
+                errors.push(err);
+                vec![Statement::Error]
+            });
 
         self.bindings.pop_scope();
 
-        Ok((
-            Function {
-                name: function.0.name.0,
-                params,
-                ty: ret_ty_type.0,
-                body,
-            },
-            function.1,
-        ))
+        (
+            (
+                Function {
+                    name: function.0.name.0,
+                    params,
+                    ty: ret_ty_type.0,
+                    body,
+                },
+                function.1,
+            ),
+            errors,
+        )
     }
 
     fn typecheck_statement<'src: 'a>(
