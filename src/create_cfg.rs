@@ -1,6 +1,5 @@
 use crate::cfg::*;
 use crate::typed_ast::{self, TypedAst};
-use petgraph::Graph;
 use rustc_hash::FxHashMap;
 
 pub fn convert_functions(typed_ast: TypedAst) -> Functions {
@@ -24,6 +23,8 @@ pub fn convert_functions(typed_ast: TypedAst) -> Functions {
             ty: func.ty.into(),
             body: cfg,
         };
+
+        functions.insert(name, function);
     }
 
     Functions { functions }

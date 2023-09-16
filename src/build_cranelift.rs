@@ -186,7 +186,7 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                 self.vars.insert(name, var);
             }
             Statement::Assign { name, value } => {
-                let var = self.vars.get(&name).unwrap().clone();
+                let var = *self.vars.get(&name).unwrap();
 
                 let value = self.translate_expr(value);
 
@@ -199,11 +199,7 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
     fn translate_expr(&mut self, expression: Expr) -> Value {
         match expression.expr {
             ExprKind::Error => unreachable!(),
-            ExprKind::Var(name) => {
-                let var = self.vars.get(&name).unwrap().clone();
-
-                self.builder.use_var(var)
-            }
+            ExprKind::Var(name) => self.builder.use_var(*self.vars.get(&name).unwrap()),
             ExprKind::Literal(literal) => match literal {
                 Literal::Int(v) => self.builder.ins().iconst(INT_TYPE, v as i64),
                 Literal::Bool(v) => self.builder.ins().iconst(BOOL_TYPE, v as i64),
@@ -297,7 +293,31 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                 },
                 _ => unreachable!(),
             },
-            ExprKind::Call { name, args } => todo!(),
+            ExprKind::Call { name, args } => {
+                let mut sig = self.module.make_signature();
+
+                for arg in &args {
+                    sig.params.push(AbiParam::new(arg.ty.into()));
+                }
+
+                sig.returns.push(AbiParam::new(expression.ty.into()));
+
+                let callee = self
+                    .module
+                    .declare_function(name, Linkage::Import, &sig)
+                    .unwrap();
+
+                let local_callee = self.module.declare_func_in_func(callee, self.builder.func);
+
+                let args = args
+                    .into_iter()
+                    .map(|arg| self.translate_expr(arg))
+                    .collect::<Vec<_>>();
+
+                let call = self.builder.ins().call(local_callee, &args);
+
+                self.builder.inst_results(call)[0]
+            }
         }
     }
 

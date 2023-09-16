@@ -79,32 +79,32 @@ pub enum ExprKind<'src> {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Param<'src> {
     pub name: &'src str,
     pub ty: Type,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Type {
     Int,
     Bool,
     Unit,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Literal {
     Int(i32),
     Bool(bool),
     Unit,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum PrefixOp {
     Negate,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum BinOp {
     Add,
     Subtract,
