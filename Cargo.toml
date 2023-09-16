@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 ariadne = "0.3.0"
 chumsky = "1.0.0-alpha.4"
-clap = { version = "4.4.2", features = ["derive"] }
-cranelift = "0.99.1"
-cranelift-jit = "0.99.1"
-cranelift-module = "0.99.1"
-cranelift-native = "0.99.1"
+clap = { version = "4.4.3", features = ["derive"] }
+cranelift = "0.99.2"
+cranelift-jit = "0.99.2"
+cranelift-module = "0.99.2"
+cranelift-native = "0.99.2"
