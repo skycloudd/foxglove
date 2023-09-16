@@ -1,13 +1,9 @@
-func test(): int  {
-    if true {
-        1;
-    } else {
-        2;
+func test(cond: bool) {
+    while cond {
+        69;
     }
-
-    4
 }
 
 func main() {
-    69;
+    test(true);
 }

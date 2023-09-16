@@ -1,4 +1,4 @@
-use crate::cfg::{self, *};
+use crate::typed_ast::{self, *};
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{Linkage, Module};
@@ -31,11 +31,13 @@ impl Jit {
         }
     }
 
-    pub fn compile(&mut self, functions: Functions) -> *const u8 {
+    pub fn compile(&mut self, typed_ast: TypedAst) -> *const u8 {
         let mut main_id = None;
 
-        for (name, func) in functions.functions {
-            for param in func.params {
+        for (name, func) in typed_ast.functions {
+            println!("compiling function: {}", name);
+
+            for param in &func.params {
                 self.ctx
                     .func
                     .signature
@@ -62,13 +64,15 @@ impl Jit {
             let mut translator = FunctionTranslator {
                 builder,
                 module: &mut self.module,
-                graph: func.body.blocks,
-                entry: func.body.entry,
                 vars: FxHashMap::default(),
                 var_index: 0,
+                loop_block: None,
+                loop_exit_block: None,
+                did_break_or_continue: false,
+                did_return: false,
             };
 
-            translator.translate_cfg();
+            translator.translate(func.body, entry_block, func.params);
 
             translator.builder.finalize();
 
@@ -83,7 +87,6 @@ impl Jit {
                 main_id = Some(id);
             }
 
-            println!("declared function: {}", name);
             println!("{}", &self.ctx.func);
 
             self.module.clear_context(&mut self.ctx);
@@ -98,72 +101,34 @@ impl Jit {
 struct FunctionTranslator<'a, 'src: 'a> {
     builder: FunctionBuilder<'a>,
     module: &'a mut JITModule,
-    graph: Vec<BasicBlock<'src>>,
-    entry: NodeIndex,
     vars: FxHashMap<&'src str, Variable>,
     var_index: usize,
+    loop_block: Option<Block>,
+    loop_exit_block: Option<Block>,
+    did_break_or_continue: bool,
+    did_return: bool,
 }
 
 impl<'a, 'src> FunctionTranslator<'a, 'src> {
-    fn translate_cfg(&mut self) {
-        let start_block = self.graph[self.entry as usize].clone();
+    fn translate(
+        &mut self,
+        statements: Vec<Statement<'src>>,
+        entry_block: Block,
+        params: Vec<Param<'src>>,
+    ) {
+        for (i, param) in params.iter().enumerate() {
+            let var = self.variable();
 
-        self.translate_bb(start_block);
-    }
+            self.builder.declare_var(var, param.ty.into());
 
-    fn translate_bb(&mut self, bb: BasicBlock<'src>) {
-        for statement in bb.statements {
-            self.translate_statement(statement);
+            self.builder
+                .def_var(var, self.builder.block_params(entry_block)[i]);
+
+            self.vars.insert(param.name, var);
         }
 
-        match bb.terminator {
-            Terminator::Return(expr) => {
-                let value = self.translate_expr(expr);
-
-                self.builder.ins().return_(&[value]);
-            }
-            Terminator::Jump(idx) => {
-                let block = self.builder.create_block();
-
-                self.builder.ins().jump(block, &[]);
-
-                self.builder.seal_block(block);
-
-                self.builder.switch_to_block(block);
-
-                self.translate_bb(self.graph[idx as usize].clone());
-            }
-            Terminator::Branch {
-                condition,
-                then,
-                otherwise,
-            } => {
-                let condition = self.translate_expr(condition);
-
-                let then_block = self.builder.create_block();
-                let otherwise_block = self.builder.create_block();
-
-                self.builder
-                    .ins()
-                    .brif(condition, then_block, &[], otherwise_block, &[]);
-
-                self.builder.seal_block(then_block);
-                self.builder.seal_block(otherwise_block);
-
-                let join_block = self.builder.create_block();
-
-                self.builder.switch_to_block(then_block);
-                self.translate_bb(self.graph[then as usize].clone());
-                self.builder.ins().jump(join_block, &[]);
-
-                self.builder.switch_to_block(otherwise_block);
-                self.translate_bb(self.graph[otherwise as usize].clone());
-                self.builder.ins().jump(join_block, &[]);
-
-                self.builder.seal_block(join_block);
-
-                self.builder.switch_to_block(join_block);
-            }
+        for statement in statements {
+            self.translate_statement(statement);
         }
     }
 
@@ -185,20 +150,114 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                 self.vars.insert(name, var);
             }
             Statement::Assign { name, value } => {
-                let var = *self.vars.get(&name).unwrap();
+                let var = *self.vars.get(name).unwrap();
 
                 let value = self.translate_expr(value);
 
                 self.builder.def_var(var, value);
             }
             Statement::Print(_) => panic!("print statement not implemented in jit"),
+            Statement::Block(statements) => {
+                for statement in statements {
+                    self.translate_statement(statement);
+                }
+            }
+            Statement::Loop(statement) => {
+                let loop_block = self.builder.create_block();
+                let loop_exit_block = self.builder.create_block();
+
+                self.loop_block = Some(loop_block);
+                self.loop_exit_block = Some(loop_exit_block);
+
+                self.builder.ins().jump(loop_block, &[]);
+
+                self.builder.switch_to_block(loop_block);
+
+                self.translate_statement(*statement);
+
+                self.builder.ins().jump(loop_block, &[]);
+
+                self.builder.seal_block(loop_block);
+                self.builder.seal_block(loop_exit_block);
+
+                self.loop_block = None;
+                self.loop_exit_block = None;
+
+                self.builder.switch_to_block(loop_exit_block);
+
+                self.did_break_or_continue = false;
+            }
+            Statement::Continue => {
+                self.builder.ins().jump(self.loop_block.unwrap(), &[]);
+
+                self.did_break_or_continue = true;
+            }
+            Statement::Break => {
+                self.builder.ins().jump(self.loop_exit_block.unwrap(), &[]);
+
+                self.did_break_or_continue = true;
+            }
+            Statement::Return(expr) => {
+                let value = self.translate_expr(expr);
+
+                self.builder.ins().return_(&[value]);
+
+                self.did_return = true;
+            }
+            Statement::Conditional {
+                condition,
+                then,
+                otherwise,
+            } => {
+                let condition = self.translate_expr(condition);
+
+                let then_block = self.builder.create_block();
+                let otherwise_block = self.builder.create_block();
+                let merge_block = self.builder.create_block();
+
+                self.builder
+                    .ins()
+                    .brif(condition, then_block, &[], otherwise_block, &[]);
+
+                self.builder.seal_block(then_block);
+
+                self.builder.switch_to_block(then_block);
+
+                self.translate_statement(*then);
+
+                if !self.did_break_or_continue && !self.did_return {
+                    self.builder.ins().jump(merge_block, &[]);
+                } else {
+                    self.did_break_or_continue = false;
+                    self.did_return = false;
+                }
+
+                self.builder.seal_block(otherwise_block);
+
+                self.builder.switch_to_block(otherwise_block);
+
+                if let Some(otherwise) = otherwise {
+                    self.translate_statement(*otherwise);
+                }
+
+                if !self.did_break_or_continue && !self.did_return {
+                    self.builder.ins().jump(merge_block, &[]);
+                } else {
+                    self.did_break_or_continue = false;
+                    self.did_return = false;
+                }
+
+                self.builder.seal_block(merge_block);
+
+                self.builder.switch_to_block(merge_block);
+            }
         }
     }
 
     fn translate_expr(&mut self, expression: Expr) -> Value {
         match expression.expr {
             ExprKind::Error => unreachable!(),
-            ExprKind::Var(name) => self.builder.use_var(*self.vars.get(&name).unwrap()),
+            ExprKind::Var(name) => self.builder.use_var(*self.vars.get(name).unwrap()),
             ExprKind::Literal(literal) => match literal {
                 Literal::Int(v) => self.builder.ins().iconst(INT_TYPE, v as i64),
                 Literal::Bool(v) => self.builder.ins().iconst(BOOL_TYPE, v as i64),
@@ -209,14 +268,14 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
 
                 match op {
                     PrefixOp::Negate => match expr.ty {
-                        cfg::Type::Int => self.builder.ins().ineg(translated_expr),
-                        cfg::Type::Bool => unreachable!(),
-                        cfg::Type::Unit => unreachable!(),
+                        typed_ast::Type::Int => self.builder.ins().ineg(translated_expr),
+                        typed_ast::Type::Bool => unreachable!(),
+                        typed_ast::Type::Unit => unreachable!(),
                     },
                 }
             }
             ExprKind::Binary { op, lhs, rhs } => match (&lhs.ty, &rhs.ty) {
-                (cfg::Type::Int, cfg::Type::Int) => {
+                (typed_ast::Type::Int, typed_ast::Type::Int) => {
                     let lhs = self.translate_expr(*lhs);
                     let rhs = self.translate_expr(*rhs);
 
@@ -244,7 +303,7 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                         BinOp::LogicalAnd | BinOp::LogicalOr => unreachable!(),
                     }
                 }
-                (cfg::Type::Bool, cfg::Type::Bool) => {
+                (typed_ast::Type::Bool, typed_ast::Type::Bool) => {
                     let lhs = self.translate_expr(*lhs);
                     let rhs = self.translate_expr(*rhs);
 
@@ -276,7 +335,7 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                         BinOp::LogicalOr => self.builder.ins().bor(lhs, rhs),
                     }
                 }
-                (cfg::Type::Unit, cfg::Type::Unit) => match op {
+                (typed_ast::Type::Unit, typed_ast::Type::Unit) => match op {
                     BinOp::Add
                     | BinOp::Subtract
                     | BinOp::Multiply
@@ -329,12 +388,12 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
     }
 }
 
-impl From<cfg::Type> for types::Type {
-    fn from(ty: cfg::Type) -> Self {
+impl From<typed_ast::Type> for types::Type {
+    fn from(ty: typed_ast::Type) -> Self {
         match ty {
-            cfg::Type::Int => INT_TYPE,
-            cfg::Type::Bool => BOOL_TYPE,
-            cfg::Type::Unit => UNIT_TYPE,
+            typed_ast::Type::Int => INT_TYPE,
+            typed_ast::Type::Bool => BOOL_TYPE,
+            typed_ast::Type::Unit => UNIT_TYPE,
         }
     }
 }

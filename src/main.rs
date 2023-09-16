@@ -5,15 +5,12 @@ use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
 use chumsky::Parser as _;
 use clap::{Parser, Subcommand};
-use create_cfg::convert_functions;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use typed_ast::TypedAst;
 
 mod ast;
 mod build_cranelift;
-mod cfg;
-mod create_cfg;
 mod error;
 mod interpreter;
 mod lexer;
@@ -43,15 +40,17 @@ fn main() {
 
             match run(&input) {
                 Ok(typed_ast) => {
-                    let functions = convert_functions(typed_ast.0);
-
                     let mut jit = build_cranelift::Jit::new();
 
-                    let code = jit.compile(functions);
+                    let code = jit.compile(typed_ast.0);
 
-                    let jit_main: extern "C" fn() = unsafe { std::mem::transmute(code) };
+                    let jit_main: extern "C" fn() -> i32 = unsafe { std::mem::transmute(code) };
 
-                    jit_main();
+                    eprintln!("... running main()");
+
+                    let exit_code = jit_main();
+
+                    std::process::exit(exit_code);
                 }
                 Err(e) => {
                     print_errors(e, &input);
@@ -100,7 +99,7 @@ fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
         (None, vec![])
     };
 
-    // dbg!(&typed_ast);
+    dbg!(&typed_ast);
 
     let errs = Vec::new()
         .into_iter()

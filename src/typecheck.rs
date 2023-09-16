@@ -95,10 +95,10 @@ impl<'a> Typechecker<'a> {
                 .into());
             }
 
-            if ret_ty_type.0 != Type::Unit {
+            if ret_ty_type.0 != Type::Int {
                 return Err(TypecheckError::MainFunctionHasWrongReturnType {
                     span: function.0.ty.1,
-                    expected: Type::Unit,
+                    expected: Type::Int,
                     found: ret_ty_type.0,
                 }
                 .into());

@@ -3,16 +3,9 @@ func fib(n: int): int {
         return n;
     }
 
-    var a = fib(n - 1);
-    var b = fib(n - 2);
-
-    a + b
+    fib(n - 1) + fib(n - 2)
 }
 
-func main() {
-    var n = 1;
-    while n < 20 {
-        print(fib(n));
-        n = n + 1;
-    }
+func main(): int {
+    fib(10)
 }
