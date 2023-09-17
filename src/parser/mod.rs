@@ -295,7 +295,6 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         let parenthesized_expr = expression
-            .clone()
             .delimited_by(
                 just(Token::Control(Control::LeftParen)),
                 just(Token::Control(Control::RightParen)),

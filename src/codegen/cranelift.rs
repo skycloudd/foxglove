@@ -264,10 +264,12 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                 Literal::Unit => self.builder.ins().iconst(UNIT_TYPE, 0),
             },
             ExprKind::Prefix { op, expr } => {
-                let translated_expr = self.translate_expr(*expr.clone());
+                let expr_ty = expr.ty;
+
+                let translated_expr = self.translate_expr(*expr);
 
                 match op {
-                    PrefixOp::Negate => match expr.ty {
+                    PrefixOp::Negate => match expr_ty {
                         typed_ast::Type::Int => self.builder.ins().ineg(translated_expr),
                         typed_ast::Type::Bool => unreachable!(),
                         typed_ast::Type::Unit => unreachable!(),

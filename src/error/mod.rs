@@ -312,23 +312,23 @@ impl From<TypecheckError> for Error {
 
 impl From<Rich<'_, String>> for Error {
     fn from(value: Rich<'_, String>) -> Self {
-        fn convert_reason(reason: RichReason<String>, span: Span) -> Error {
+        fn convert_reason(reason: &RichReason<String>, span: Span) -> Error {
             match reason {
                 RichReason::ExpectedFound { expected, found } => Error::ExpectedFound {
                     span,
                     expected: expected.iter().map(ToString::to_string).collect(),
-                    found: found.map(|s| s.to_string()),
+                    found: found.as_ref().map(|s| s.to_string()),
                 },
-                RichReason::Custom(reason) => Error::Custom(span, reason),
+                RichReason::Custom(reason) => Error::Custom(span, reason.to_string()),
                 RichReason::Many(reasons) => Error::Many(
                     reasons
-                        .into_iter()
+                        .iter()
                         .map(|reason| convert_reason(reason, span))
                         .collect(),
                 ),
             }
         }
 
-        convert_reason(value.reason().clone(), *value.span())
+        convert_reason(value.reason(), *value.span())
     }
 }
