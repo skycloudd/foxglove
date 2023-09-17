@@ -36,28 +36,32 @@ impl<'a> Typechecker<'a> {
         &mut self,
         ast: Spanned<Ast<'src>>,
     ) -> Result<Spanned<TypedAst<'src>>, Vec<Error>> {
-        let mut functions = HashMap::new();
+        let mut toplevels = HashMap::new();
         let mut errors = vec![];
 
-        for function in ast.0.functions.0 {
-            let name = function.0.name.0;
-            self.current_fn = Some(name);
+        for toplevel in ast.0.toplevels.0 {
+            match toplevel.0 {
+                ast::TopLevel::Function(function) => {
+                    let name = function.0.name.0;
+                    self.current_fn = Some(name);
 
-            let (func, tc_errs) = self.typecheck_function(function);
+                    let (func, tc_errs) = self.typecheck_function(function);
 
-            functions.insert(name, func.0);
+                    toplevels.insert(name, TopLevel::Function(func.0));
 
-            errors.extend(tc_errs);
+                    errors.extend(tc_errs);
+                }
+            }
         }
 
         self.current_fn = None;
 
-        if functions.get("main").is_none() {
+        if toplevels.get("main").is_none() {
             errors.push(TypecheckError::MissingMainFunction((ast.1.end..ast.1.end).into()).into());
         }
 
         if errors.is_empty() {
-            Ok((TypedAst { functions }, ast.1))
+            Ok((TypedAst { toplevels }, ast.1))
         } else {
             Err(errors)
         }

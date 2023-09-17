@@ -2,7 +2,12 @@ use crate::Spanned;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ast<'src> {
-    pub functions: s!(Vec<s!(Function<'src>)>),
+    pub toplevels: s!(Vec<s!(TopLevel<'src>)>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TopLevel<'src> {
+    Function(s!(Function<'src>)),
 }
 
 #[derive(Clone, Debug, PartialEq)]

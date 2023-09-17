@@ -21,58 +21,63 @@ impl<'a> Codegen<'a> {
     pub fn compile(&mut self, typed_ast: TypedAst) -> Option<FuncId> {
         let mut main_id = None;
 
-        for (name, func) in typed_ast.functions {
-            for param in &func.params {
-                self.ctx
-                    .func
-                    .signature
-                    .params
-                    .push(AbiParam::new(param.ty.into()));
+        for (name, toplevel) in typed_ast.toplevels {
+            match toplevel {
+                TopLevel::Function(function) => {
+                    for param in &function.params {
+                        self.ctx
+                            .func
+                            .signature
+                            .params
+                            .push(AbiParam::new(param.ty.into()));
+                    }
+
+                    self.ctx
+                        .func
+                        .signature
+                        .returns
+                        .push(AbiParam::new(function.ty.into()));
+
+                    let mut builder =
+                        FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_ctx);
+
+                    let entry_block = builder.create_block();
+
+                    builder.append_block_params_for_function_params(entry_block);
+
+                    builder.switch_to_block(entry_block);
+
+                    builder.seal_block(entry_block);
+
+                    let mut translator = FunctionTranslator {
+                        builder,
+                        module: &mut *self.module,
+                        vars: HashMap::new(),
+                        var_index: 0,
+                        loop_block: None,
+                        loop_exit_block: None,
+                        did_break_or_continue: false,
+                        did_return: false,
+                    };
+
+                    translator.translate(function.body, entry_block, function.params);
+
+                    translator.builder.finalize();
+
+                    let id = self
+                        .module
+                        .declare_function(name, Linkage::Export, &self.ctx.func.signature)
+                        .unwrap();
+
+                    self.module.define_function(id, &mut self.ctx).unwrap();
+
+                    if name == "main" {
+                        main_id = Some(id);
+                    }
+
+                    self.module.clear_context(&mut self.ctx);
+                }
             }
-
-            self.ctx
-                .func
-                .signature
-                .returns
-                .push(AbiParam::new(func.ty.into()));
-
-            let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_ctx);
-
-            let entry_block = builder.create_block();
-
-            builder.append_block_params_for_function_params(entry_block);
-
-            builder.switch_to_block(entry_block);
-
-            builder.seal_block(entry_block);
-
-            let mut translator = FunctionTranslator {
-                builder,
-                module: &mut *self.module,
-                vars: HashMap::new(),
-                var_index: 0,
-                loop_block: None,
-                loop_exit_block: None,
-                did_break_or_continue: false,
-                did_return: false,
-            };
-
-            translator.translate(func.body, entry_block, func.params);
-
-            translator.builder.finalize();
-
-            let id = self
-                .module
-                .declare_function(name, Linkage::Export, &self.ctx.func.signature)
-                .unwrap();
-
-            self.module.define_function(id, &mut self.ctx).unwrap();
-
-            if name == "main" {
-                main_id = Some(id);
-            }
-
-            self.module.clear_context(&mut self.ctx);
         }
 
         main_id

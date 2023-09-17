@@ -2,7 +2,12 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedAst<'src> {
-    pub functions: HashMap<&'src str, Function<'src>>,
+    pub toplevels: HashMap<&'src str, TopLevel<'src>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TopLevel<'src> {
+    Function(Function<'src>),
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -15,17 +15,18 @@ pub fn parser<'tokens, 'src: 'tokens>() -> impl Parser<
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
     program_parser()
-        .map_with_span(|functions, span| (Ast { functions }, span))
+        .map_with_span(|toplevels, span| (Ast { toplevels }, span))
         .boxed()
 }
 
 fn program_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
-    Spanned<Vec<Spanned<Function<'src>>>>,
+    Spanned<Vec<Spanned<TopLevel<'src>>>>,
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
     function_parser()
+        .map_with_span(|function, span| (TopLevel::Function(function), span))
         .repeated()
         .collect()
         .then_ignore(end())
