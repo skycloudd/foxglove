@@ -3,7 +3,10 @@ use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
 use chumsky::Parser as _;
 use clap::{Parser, Subcommand};
-use codegen::cranelift::Jit;
+use codegen::cranelift::Codegen;
+use cranelift::prelude::*;
+use cranelift_jit::{JITBuilder, JITModule};
+use cranelift_object::{ObjectBuilder, ObjectModule, ObjectProduct};
 use lexer::lexer;
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -25,7 +28,16 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
-    Run { filename: PathBuf },
+    Run {
+        filename: PathBuf,
+    },
+    Build {
+        filename: PathBuf,
+
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        // TODO: add optimization level flag
+    },
 }
 
 fn main() {
@@ -37,9 +49,64 @@ fn main() {
 
             match run(&input) {
                 Ok((typed_ast, _)) => {
-                    let exit_code = jit(typed_ast);
+                    let jit_main = jit(typed_ast);
+
+                    let exit_code = jit_main();
 
                     std::process::exit(exit_code);
+                }
+                Err(e) => {
+                    print_errors(e, &input);
+
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::Build { filename, out } => {
+            let input = read_to_string(&filename).unwrap();
+
+            match run(&input) {
+                Ok((typed_ast, _)) => {
+                    let obj = object(typed_ast);
+
+                    let data = obj.emit().unwrap();
+
+                    let obj_filename = filename.with_extension("o");
+
+                    let executable_filename = match out {
+                        Some(out) => out,
+                        None => {
+                            let executable_filename: PathBuf = filename
+                                .with_extension(if cfg!(windows) { "exe" } else { "" })
+                                .file_name()
+                                .unwrap()
+                                .into();
+
+                            if executable_filename.exists() {
+                                eprintln!("warning: default output file already exists, please specify an output file with -o");
+                                std::process::exit(1);
+                            } else {
+                                executable_filename
+                            }
+                        }
+                    };
+
+                    std::fs::write(&obj_filename, data).unwrap();
+
+                    let status = std::process::Command::new("cc")
+                        .arg(&obj_filename)
+                        .arg("-o")
+                        .arg(executable_filename)
+                        .status()
+                        .unwrap();
+
+                    std::fs::remove_file(obj_filename).unwrap();
+
+                    if status.success() {
+                        std::process::exit(0);
+                    } else {
+                        std::process::exit(1);
+                    }
                 }
                 Err(e) => {
                     print_errors(e, &input);
@@ -94,14 +161,51 @@ fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
     }
 }
 
-fn jit(typed_ast: TypedAst) -> i32 {
-    let mut jit = Jit::new();
+fn object(typed_ast: TypedAst) -> ObjectProduct {
+    let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
+        panic!("host machine is not supported: {}", msg);
+    });
 
-    let code = jit.compile(typed_ast);
+    let mut settings = settings::builder();
 
-    let jit_main: extern "C" fn() -> i32 = unsafe { std::mem::transmute(code) };
+    settings.enable("is_pic").unwrap();
 
-    jit_main()
+    let isa = isa_builder.finish(settings::Flags::new(settings)).unwrap();
+
+    let builder =
+        ObjectBuilder::new(isa, "main", cranelift_module::default_libcall_names()).unwrap();
+
+    let mut object_module = ObjectModule::new(builder);
+
+    let mut codegen = Codegen::new(&mut object_module);
+
+    let _ = codegen.compile(typed_ast);
+
+    object_module.finish()
+}
+
+fn jit(typed_ast: TypedAst) -> extern "C" fn() -> i32 {
+    let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
+        panic!("host machine is not supported: {}", msg);
+    });
+
+    let isa = isa_builder
+        .finish(settings::Flags::new(settings::builder()))
+        .unwrap();
+
+    let builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+
+    let mut jit_module = JITModule::new(builder);
+
+    let mut codegen = Codegen::new(&mut jit_module);
+
+    let main_id = codegen.compile(typed_ast);
+
+    jit_module.finalize_definitions().unwrap();
+
+    let code = jit_module.get_finalized_function(main_id.unwrap());
+
+    unsafe { std::mem::transmute(code) }
 }
 
 pub type Span = SimpleSpan<usize>;

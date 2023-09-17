@@ -40,7 +40,6 @@ pub enum Statement<'src> {
         name: &'src str,
         value: Expr<'src>,
     },
-    Print(Expr<'src>),
     Loop(Box<Statement<'src>>),
     Continue,
     Break,

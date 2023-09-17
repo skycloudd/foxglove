@@ -1,42 +1,27 @@
 use crate::typechecker::typed_ast::{self, *};
 use cranelift::prelude::*;
-use cranelift_jit::{JITBuilder, JITModule};
-use cranelift_module::{Linkage, Module};
+use cranelift_module::{FuncId, Linkage, Module};
 use std::collections::HashMap;
 
-pub struct Jit {
+pub struct Codegen<'a> {
     builder_ctx: FunctionBuilderContext,
     ctx: codegen::Context,
-    module: JITModule,
+    module: &'a mut dyn Module,
 }
 
-impl Jit {
-    pub fn new() -> Self {
-        let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
-            panic!("host machine is not supported: {}", msg);
-        });
-
-        let isa = isa_builder
-            .finish(settings::Flags::new(settings::builder()))
-            .unwrap();
-
-        let builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
-
-        let module = JITModule::new(builder);
-
+impl<'a> Codegen<'a> {
+    pub fn new(module: &'a mut impl Module) -> Self {
         Self {
             builder_ctx: FunctionBuilderContext::new(),
             ctx: module.make_context(),
-            module,
+            module: module,
         }
     }
 
-    pub fn compile(&mut self, typed_ast: TypedAst) -> *const u8 {
+    pub fn compile(&mut self, typed_ast: TypedAst) -> Option<FuncId> {
         let mut main_id = None;
 
         for (name, func) in typed_ast.functions {
-            // println!("compiling function: {}", name);
-
             for param in &func.params {
                 self.ctx
                     .func
@@ -63,7 +48,7 @@ impl Jit {
 
             let mut translator = FunctionTranslator {
                 builder,
-                module: &mut self.module,
+                module: &mut *self.module,
                 vars: HashMap::new(),
                 var_index: 0,
                 loop_block: None,
@@ -87,20 +72,16 @@ impl Jit {
                 main_id = Some(id);
             }
 
-            // println!("{}", &self.ctx.func);
-
             self.module.clear_context(&mut self.ctx);
         }
 
-        self.module.finalize_definitions().unwrap();
-
-        self.module.get_finalized_function(main_id.unwrap())
+        main_id
     }
 }
 
 struct FunctionTranslator<'a, 'src: 'a> {
     builder: FunctionBuilder<'a>,
-    module: &'a mut JITModule,
+    module: &'a mut dyn Module,
     vars: HashMap<&'src str, Variable>,
     var_index: usize,
     loop_block: Option<Block>,
@@ -156,7 +137,6 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
 
                 self.builder.def_var(var, value);
             }
-            Statement::Print(_) => panic!("print statement not implemented in jit"),
             Statement::Block(statements) => {
                 for statement in statements {
                     self.translate_statement(statement);

@@ -168,12 +168,6 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(|(name, value)| Statement::Assign { name, value })
             .boxed();
 
-        let print = just(Token::Keyword(Keyword::Print))
-            .ignore_then(expression_parser().or_not())
-            .then_ignore(just(Token::Control(Control::Semicolon)))
-            .map(Statement::Print)
-            .boxed();
-
         let loop_ = just(Token::Keyword(Keyword::Loop))
             .ignore_then(
                 block
@@ -231,7 +225,7 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .boxed();
 
         choice((
-            expr, block, let_, assign, print, loop_, continue_, break_, return_, if_, while_,
+            expr, block, let_, assign, loop_, continue_, break_, return_, if_, while_,
         ))
         .recover_with(via_parser(nested_delimiters(
             Token::Control(Control::LeftCurly),

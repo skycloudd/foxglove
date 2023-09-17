@@ -214,13 +214,6 @@ impl<'a> Typechecker<'a> {
                         value: value.0,
                     }
                 }
-                ast::Statement::Print(expr) => Statement::Print(match expr {
-                    Some(expr) => self.typecheck_expr(expr)?.0,
-                    None => Expr {
-                        expr: ExprKind::Literal(Literal::Unit),
-                        ty: Type::Unit,
-                    },
-                }),
                 ast::Statement::Loop(stmt) => {
                     self.is_in_loop = true;
 
