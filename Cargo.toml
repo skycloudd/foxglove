@@ -12,3 +12,5 @@ cranelift-jit = "0.99.2"
 cranelift-module = "0.99.2"
 cranelift-native = "0.99.2"
 cranelift-object = "0.99.2"
+log = "0.4.20"
+simple_logger = { version = "4.2.0", default-features = false, features = ["colors", "stderr"] }

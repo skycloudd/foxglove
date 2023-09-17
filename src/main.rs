@@ -4,10 +4,13 @@ use chumsky::span::SimpleSpan;
 use chumsky::Parser as _;
 use clap::{Parser, Subcommand};
 use codegen::cranelift::Codegen;
+use codegen::OptLevel;
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_object::{ObjectBuilder, ObjectModule, ObjectProduct};
 use lexer::lexer;
+use log::{error, info};
+use simple_logger::SimpleLogger;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use typechecker::typecheck;
@@ -29,45 +32,78 @@ struct Args {
 #[derive(Subcommand)]
 enum Command {
     Run {
+        /// Input file
         filename: PathBuf,
+
+        #[arg(short = 'O', long, default_value = "0")]
+        /// Optimization level
+        opt: OptLevel,
     },
     Build {
+        /// Input file
         filename: PathBuf,
 
         #[arg(short, long)]
+        /// Output file
         out: Option<PathBuf>,
-        // TODO: add optimization level flag
+
+        #[arg(short = 'O', long, default_value = "0")]
+        /// Optimization level
+        opt: OptLevel,
     },
 }
 
 fn main() {
+    SimpleLogger::new()
+        .with_level(log::LevelFilter::Info)
+        .with_module_level("cranelift", log::LevelFilter::Warn)
+        .init()
+        .unwrap();
+
     let args = Args::parse();
 
     match args.command {
-        Command::Run { filename } => {
-            let input = read_to_string(filename).unwrap();
+        Command::Run { filename, opt } => {
+            let input = read_to_string(&filename).unwrap();
+
+            let short_filename = filename.file_stem().unwrap().to_string_lossy();
+
+            info!("Compiling {}", short_filename);
 
             match run(&input) {
                 Ok((typed_ast, _)) => {
-                    let jit_main = jit(typed_ast);
+                    let jit_main = jit(typed_ast, opt);
+
+                    info!("Finished");
+
+                    info!("Running");
 
                     let exit_code = jit_main();
+
+                    info!("Exited with code {}", exit_code);
 
                     std::process::exit(exit_code);
                 }
                 Err(e) => {
                     print_errors(e, &input);
 
+                    error!("Failed to compile {}", short_filename);
+
                     std::process::exit(1);
                 }
             }
         }
-        Command::Build { filename, out } => {
+
+        Command::Build { filename, out, opt } => {
             let input = read_to_string(&filename).unwrap();
+
+            let short_filename = filename.file_stem().unwrap().to_string_lossy();
+
+            info!("Compiling {}", short_filename);
 
             match run(&input) {
                 Ok((typed_ast, _)) => {
-                    let obj = object(typed_ast);
+                    let obj = object(typed_ast, opt);
 
                     let data = obj.emit().unwrap();
 
@@ -83,7 +119,7 @@ fn main() {
                                 .into();
 
                             if executable_filename.exists() {
-                                eprintln!("warning: default output file already exists, please specify an output file with -o");
+                                error!("default output file already exists, please specify an output file with -o");
                                 std::process::exit(1);
                             } else {
                                 executable_filename
@@ -92,6 +128,8 @@ fn main() {
                     };
 
                     std::fs::write(&obj_filename, data).unwrap();
+
+                    info!("Linking {}", short_filename);
 
                     let status = std::process::Command::new("cc")
                         .arg(&obj_filename)
@@ -103,13 +141,19 @@ fn main() {
                     std::fs::remove_file(obj_filename).unwrap();
 
                     if status.success() {
+                        info!("Finished");
+
                         std::process::exit(0);
                     } else {
+                        error!("Failed to link {}", short_filename);
+
                         std::process::exit(1);
                     }
                 }
                 Err(e) => {
                     print_errors(e, &input);
+
+                    error!("Failed to compile {}", short_filename);
 
                     std::process::exit(1);
                 }
@@ -161,13 +205,14 @@ fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
     }
 }
 
-fn object(typed_ast: TypedAst) -> ObjectProduct {
+fn object(typed_ast: TypedAst, opt: OptLevel) -> ObjectProduct {
     let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
         panic!("host machine is not supported: {}", msg);
     });
 
     let mut settings = settings::builder();
 
+    settings.set("opt_level", &opt.to_string()).unwrap();
     settings.enable("is_pic").unwrap();
 
     let isa = isa_builder.finish(settings::Flags::new(settings)).unwrap();
@@ -184,14 +229,16 @@ fn object(typed_ast: TypedAst) -> ObjectProduct {
     object_module.finish()
 }
 
-fn jit(typed_ast: TypedAst) -> extern "C" fn() -> i32 {
+fn jit(typed_ast: TypedAst, opt: OptLevel) -> extern "C" fn() -> i32 {
     let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
         panic!("host machine is not supported: {}", msg);
     });
 
-    let isa = isa_builder
-        .finish(settings::Flags::new(settings::builder()))
-        .unwrap();
+    let mut settings = settings::builder();
+
+    settings.set("opt_level", &opt.to_string()).unwrap();
+
+    let isa = isa_builder.finish(settings::Flags::new(settings)).unwrap();
 
     let builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
 
