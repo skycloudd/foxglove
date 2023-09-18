@@ -5,6 +5,7 @@ use chumsky::input::SpannedInput;
 use chumsky::prelude::*;
 
 pub mod ast;
+pub mod ast_printer;
 
 type ParserInput<'tokens, 'src> = SpannedInput<Token<'src>, Span, &'tokens [(Token<'src>, Span)]>;
 

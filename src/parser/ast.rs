@@ -31,6 +31,16 @@ pub enum Type {
     Unit,
 }
 
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Type::Int => write!(f, "int"),
+            Type::Bool => write!(f, "bool"),
+            Type::Unit => write!(f, "unit"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement<'src> {
     Error,
@@ -85,6 +95,16 @@ pub enum Literal {
     Int(i32),
     Bool(bool),
     Unit,
+}
+
+impl std::fmt::Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Literal::Int(i) => write!(f, "{}", i),
+            Literal::Bool(b) => write!(f, "{}", b),
+            Literal::Unit => write!(f, "#"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

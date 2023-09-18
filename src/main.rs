@@ -10,6 +10,8 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_object::{ObjectBuilder, ObjectModule, ObjectProduct};
 use lexer::lexer;
 use log::{error, info};
+use parser::ast_printer::AstNode;
+use ptree::print_tree;
 use simple_logger::SimpleLogger;
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -27,6 +29,10 @@ mod typechecker;
 struct Args {
     #[command(subcommand)]
     command: Command,
+
+    #[arg(name = "ast", long)]
+    /// Print the AST
+    debug_ast: bool,
 }
 
 #[derive(Subcommand)]
@@ -70,7 +76,7 @@ fn main() {
 
             info!("Compiling {}", short_filename);
 
-            match run(&input) {
+            match run(&input, args.debug_ast) {
                 Ok((typed_ast, _)) => {
                     let jit_main = jit(typed_ast, opt);
 
@@ -101,7 +107,7 @@ fn main() {
 
             info!("Compiling {}", short_filename);
 
-            match run(&input) {
+            match run(&input, args.debug_ast) {
                 Ok((typed_ast, _)) => {
                     let obj = object(typed_ast, opt);
 
@@ -162,7 +168,7 @@ fn main() {
     }
 }
 
-fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
+fn run(input: &str, debug_ast: bool) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
     let (tokens, lex_errs) = lexer().parse(input).into_output_errors();
 
     let (ast, parse_errs) = tokens
@@ -173,6 +179,10 @@ fn run(input: &str) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
                 .into_output_errors()
         })
         .unwrap_or((None, vec![]));
+
+    if debug_ast {
+        print_tree(&AstNode::Ast(ast.as_ref().unwrap().0.clone())).unwrap();
+    }
 
     let (typed_ast, tc_errs) = ast
         .map(|ast| match typecheck(ast) {
