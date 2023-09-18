@@ -145,7 +145,7 @@ impl TreeItem for AstNode<'_> {
                 AstNode::Ast(_) => "Ast".to_string(),
                 AstNode::TopLevel(_) => "TopLevel".to_string(),
                 AstNode::Function(function) => format!(
-                    "func {}({}): {}",
+                    "Function [{}({}): {}]",
                     function.name.0,
                     function
                         .params

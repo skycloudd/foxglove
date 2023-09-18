@@ -30,9 +30,13 @@ struct Args {
     #[command(subcommand)]
     command: Command,
 
-    #[arg(name = "ast", long)]
+    #[arg(name = "ast", short, long)]
     /// Print the AST
     debug_ast: bool,
+
+    #[arg(name = "cranelift", short, long)]
+    /// Print Cranelift logs
+    debug_cranelift: bool,
 }
 
 #[derive(Subcommand)]
@@ -60,13 +64,20 @@ enum Command {
 }
 
 fn main() {
+    let args = Args::parse();
+
     SimpleLogger::new()
         .with_level(log::LevelFilter::Info)
-        .with_module_level("cranelift", log::LevelFilter::Warn)
+        .with_module_level(
+            "cranelift",
+            if args.debug_cranelift {
+                log::LevelFilter::Info
+            } else {
+                log::LevelFilter::Warn
+            },
+        )
         .init()
         .unwrap();
-
-    let args = Args::parse();
 
     match args.command {
         Command::Run { filename, opt } => {
