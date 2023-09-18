@@ -41,8 +41,27 @@ fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     Spanned<Function<'src>>,
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
-    just(Token::Keyword(Keyword::Func))
-        .ignore_then(ident_parser())
+    let attr_parser = just(Token::Hash).ignore_then(
+        ident_parser()
+            .then(
+                just(Token::Control(Control::Equals))
+                    .ignore_then(expression_parser())
+                    .or_not(),
+            )
+            .delimited_by(
+                just(Token::Control(Control::LeftSquare)),
+                just(Token::Control(Control::RightSquare)),
+            )
+            .map_with_span(|(name, value), span| (Attr { name, value }, span))
+            .boxed(),
+    );
+
+    attr_parser
+        .repeated()
+        .collect()
+        .map_with_span(|attrs, span| (attrs, span))
+        .then_ignore(just(Token::Keyword(Keyword::Func)))
+        .then(ident_parser())
         .then(
             param_parser()
                 .separated_by(just(Token::Control(Control::Comma)))
@@ -85,32 +104,35 @@ fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
                 just(Token::Control(Control::RightCurly)),
             ),
         )
-        .map_with_span(|(((name, params), ty), (mut body, maybe_expr)), span| {
-            body.0.push(match maybe_expr {
-                Some(expr) => (Statement::Return(Some(expr.clone())), expr.1),
-                None => {
-                    let span = (body.1.end..body.1.end).into();
+        .map_with_span(
+            |((((attrs, name), params), ty), (mut body, maybe_expr)), span| {
+                body.0.push(match maybe_expr {
+                    Some(expr) => (Statement::Return(Some(expr.clone())), expr.1),
+                    None => {
+                        let span = (body.1.end..body.1.end).into();
 
-                    (
-                        Statement::Return(Some((Expr::Literal((Literal::Unit, span)), span))),
-                        span,
-                    )
-                }
-            });
+                        (
+                            Statement::Return(Some((Expr::Literal((Literal::Unit, span)), span))),
+                            span,
+                        )
+                    }
+                });
 
-            (
-                Function {
-                    name,
-                    params,
-                    ty: match ty {
-                        Some(ty) => ty,
-                        None => (Type::Unit, name.1),
+                (
+                    Function {
+                        attrs,
+                        name,
+                        params,
+                        ty: match ty {
+                            Some(ty) => ty,
+                            None => (Type::Unit, name.1),
+                        },
+                        body,
                     },
-                    body,
-                },
-                span,
-            )
-        })
+                    span,
+                )
+            },
+        )
 }
 
 fn param_parser<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -489,7 +511,7 @@ fn literal_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         Token::Int(n) => Literal::Int(n),
         Token::Keyword(Keyword::True) => Literal::Bool(true),
         Token::Keyword(Keyword::False) => Literal::Bool(false),
-        Token::Unit => Literal::Unit,
+        Token::Hash => Literal::Unit,
     }
     .map_with_span(|literal, span| (literal, span))
     .boxed()
@@ -515,7 +537,7 @@ fn type_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     select! {
         Token::Ident("int") => Type::Int,
         Token::Ident("bool") => Type::Bool,
-        Token::Unit => Type::Unit,
+        Token::Hash => Type::Unit,
     }
     .map_with_span(|ty, span| (ty, span))
     .boxed()

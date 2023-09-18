@@ -88,6 +88,8 @@ impl Error {
                 TypecheckError::MissingMainFunction(_) => 11,
                 TypecheckError::ContinueOutsideOfLoop(_) => 12,
                 TypecheckError::BreakOutsideOfLoop(_) => 13,
+                TypecheckError::UnknownAttribute { .. } => 14,
+                TypecheckError::AttributeHasValue { .. } => 15,
             },
             Error::ExpectedFound { .. } => 1,
             Error::Custom(_, _) => 0,
@@ -142,6 +144,14 @@ pub enum TypecheckError {
     MissingMainFunction(Span),
     ContinueOutsideOfLoop(Span),
     BreakOutsideOfLoop(Span),
+    UnknownAttribute {
+        span: Span,
+        name: String,
+    },
+    AttributeHasValue {
+        span: Span,
+        name: String,
+    },
 }
 
 impl TypecheckError {
@@ -299,6 +309,19 @@ impl TypecheckError {
                 "Break statement outside of a loop".to_string(),
                 vec![(("Break outside of loop".to_string(), Color::Yellow), *span)],
                 None,
+            ),
+            TypecheckError::UnknownAttribute { span, name } => (
+                format!("Unknown attribute '{}'", name.fg(Color::Yellow)),
+                vec![(("Unknown attribute".to_string(), Color::Yellow), *span)],
+                None,
+            ),
+            TypecheckError::AttributeHasValue { span, name } => (
+                format!("Attribute '{}' cannot have a value", name.fg(Color::Yellow)),
+                vec![(
+                    ("Attribute cannot have a value".to_string(), Color::Yellow),
+                    *span,
+                )],
+                Some(format!("help: try `#[{}]`", name)),
             ),
         }
     }

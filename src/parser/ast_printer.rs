@@ -7,6 +7,7 @@ pub enum AstNode<'src> {
     Ast(Ast<'src>),
     TopLevel(TopLevel<'src>),
     Function(Function<'src>),
+    Body(Vec<Statement<'src>>),
     Param(Param<'src>),
     Statement(Statement<'src>),
     Expr(Expr<'src>),
@@ -14,6 +15,8 @@ pub enum AstNode<'src> {
     Var(String),
     Leaf(String),
     Args(Vec<Expr<'src>>),
+    Attrs(Vec<Attr<'src>>),
+    Attr(Attr<'src>),
 }
 
 impl<'src> From<Ast<'src>> for AstNode<'src> {
@@ -31,6 +34,12 @@ impl<'src> From<TopLevel<'src>> for AstNode<'src> {
 impl<'src> From<Function<'src>> for AstNode<'src> {
     fn from(function: Function<'src>) -> AstNode<'src> {
         Self::Function(function)
+    }
+}
+
+impl<'src> From<Vec<Statement<'src>>> for AstNode<'src> {
+    fn from(body: Vec<Statement<'src>>) -> AstNode<'src> {
+        Self::Body(body)
     }
 }
 
@@ -109,6 +118,18 @@ impl<'src> From<Vec<Expr<'src>>> for AstNode<'src> {
     }
 }
 
+impl<'src> From<Vec<Attr<'src>>> for AstNode<'src> {
+    fn from(attrs: Vec<Attr<'src>>) -> AstNode<'src> {
+        Self::Attrs(attrs)
+    }
+}
+
+impl<'src> From<Attr<'src>> for AstNode<'src> {
+    fn from(attr: Attr<'src>) -> AstNode<'src> {
+        Self::Attr(attr)
+    }
+}
+
 impl TreeItem for AstNode<'_> {
     type Child = Self;
 
@@ -135,43 +156,29 @@ impl TreeItem for AstNode<'_> {
                         .join(", "),
                     function.ty.0
                 ),
+                AstNode::Body(_) => "Body".to_string(),
                 AstNode::Param(_) => "Param".to_string(),
                 AstNode::Statement(statement) => match statement {
                     Statement::Error => "Error",
                     Statement::Expr(_) => "Expr",
                     Statement::Block(_) => "Block",
-                    Statement::Let {
-                        name: _,
-                        ty: _,
-                        value: _,
-                    } => "Let",
-                    Statement::Assign { name: _, value: _ } => "Assign",
+                    Statement::Let { .. } => "Let",
+                    Statement::Assign { .. } => "Assign",
                     Statement::Loop(_) => "Loop",
                     Statement::Continue => "Continue",
                     Statement::Break => "Break",
                     Statement::Return(_) => "Return",
-                    Statement::Conditional {
-                        condition: _,
-                        then: _,
-                        otherwise: _,
-                    } => "Conditional",
-                    Statement::While {
-                        condition: _,
-                        body: _,
-                    } => "While",
+                    Statement::Conditional { .. } => "Conditional",
+                    Statement::While { .. } => "While",
                 }
                 .to_string(),
                 AstNode::Expr(expr) => match expr {
                     Expr::Error => "Error",
                     Expr::Var(_) => "Var",
                     Expr::Literal(_) => "Literal",
-                    Expr::Prefix { op: _, expr: _ } => "Prefix",
-                    Expr::Binary {
-                        op: _,
-                        lhs: _,
-                        rhs: _,
-                    } => "Binary",
-                    Expr::Call { name: _, args: _ } => "Call",
+                    Expr::Prefix { .. } => "Prefix",
+                    Expr::Binary { .. } => "Binary",
+                    Expr::Call { .. } => "Call",
                 }
                 .to_string(),
                 AstNode::Literal(literal) => match literal {
@@ -183,6 +190,8 @@ impl TreeItem for AstNode<'_> {
                 AstNode::Var(_) => "Var".to_string(),
                 AstNode::Leaf(name) => name.to_string(),
                 AstNode::Args(_) => "Args".to_string(),
+                AstNode::Attrs(_) => "Attrs".to_string(),
+                AstNode::Attr(_) => "Attr".to_string(),
             })
         )
     }
@@ -198,11 +207,28 @@ impl TreeItem for AstNode<'_> {
             AstNode::TopLevel(toplevel) => match toplevel {
                 TopLevel::Function(function) => vec![function.0.clone().into()],
             },
-            AstNode::Function(function) => function
-                .body
-                .0
+            AstNode::Function(function) => {
+                let attrs = function
+                    .attrs
+                    .0
+                    .iter()
+                    .map(|attr| attr.0.clone())
+                    .collect::<Vec<_>>()
+                    .into();
+
+                let body = function
+                    .body
+                    .0
+                    .iter()
+                    .map(|statement| statement.0.clone())
+                    .collect::<Vec<_>>()
+                    .into();
+
+                vec![attrs, body]
+            }
+            AstNode::Body(body) => body
                 .iter()
-                .map(|statement| statement.0.clone().into())
+                .map(|statement| statement.clone().into())
                 .collect(),
             AstNode::Param(param) => {
                 vec![param.name.0.to_string().into(), param.ty.0.clone().into()]
@@ -286,6 +312,19 @@ impl TreeItem for AstNode<'_> {
                 .iter()
                 .map(|arg| arg.clone().into())
                 .collect::<Vec<_>>(),
+            AstNode::Attrs(attrs) => attrs
+                .iter()
+                .map(|attr| attr.clone().into())
+                .collect::<Vec<_>>(),
+            AstNode::Attr(attr) => {
+                let mut vec = vec![attr.name.0.to_string().into()];
+
+                if let Some(value) = &attr.value {
+                    vec.push(value.0.clone().into());
+                }
+
+                vec
+            }
         })
     }
 }

@@ -1,7 +1,7 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Token<'src> {
     Int(i32),
-    Unit,
+    Hash,
     Operator(Operator),
     Control(Control),
     Keyword(Keyword),
@@ -12,7 +12,7 @@ impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Token::Int(n) => write!(f, "{}", n),
-            Token::Unit => write!(f, "#"),
+            Token::Hash => write!(f, "#"),
             Token::Operator(op) => write!(f, "{}", op),
             Token::Control(ctrl) => write!(f, "{}", ctrl),
             Token::Keyword(kw) => write!(f, "{}", kw),

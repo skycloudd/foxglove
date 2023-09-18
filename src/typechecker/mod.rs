@@ -75,6 +75,58 @@ impl<'a> Typechecker<'a> {
 
         self.bindings.push_scope();
 
+        let mut attrs = vec![];
+
+        for attr in function.0.attrs.0 {
+            let value =
+                attr.0
+                    .value
+                    .as_ref()
+                    .map(|value| match self.typecheck_expr(value.clone()) {
+                        Ok(value) => value.0,
+                        Err(err) => {
+                            errors.push(err);
+
+                            Expr {
+                                expr: ExprKind::Error,
+                                ty: Type::Unit,
+                            }
+                        }
+                    });
+
+            let kind = match attr.0.name.0 {
+                "export" => AttrKind::Export,
+                _ => {
+                    errors.push(
+                        TypecheckError::UnknownAttribute {
+                            span: attr.0.name.1,
+                            name: attr.0.name.0.to_string(),
+                        }
+                        .into(),
+                    );
+
+                    AttrKind::Error
+                }
+            };
+
+            match kind {
+                AttrKind::Error => {}
+                AttrKind::Export => {
+                    if let Some((_, span)) = attr.0.value {
+                        errors.push(
+                            TypecheckError::AttributeHasValue {
+                                span,
+                                name: attr.0.name.0.to_string(),
+                            }
+                            .into(),
+                        );
+                    }
+                }
+            }
+
+            attrs.push(Attr { kind, value });
+        }
+
         let mut params = vec![];
         let mut param_types = vec![];
 
@@ -119,24 +171,25 @@ impl<'a> Typechecker<'a> {
 
         self.fns.insert(function.0.name.0, (param_types, ret_ty));
 
-        let body = function
-            .0
-            .body
-            .0
-            .into_iter()
-            .map(|stmt| self.typecheck_statement(stmt))
-            .map(|stmt| stmt.map(|stmt| stmt.0))
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap_or_else(|err| {
-                errors.push(err);
-                vec![Statement::Error]
+        let mut body = vec![];
+
+        for stmt in function.0.body.0 {
+            body.push(match self.typecheck_statement(stmt) {
+                Ok(stmt) => stmt.0,
+                Err(err) => {
+                    errors.push(err);
+
+                    Statement::Error
+                }
             });
+        }
 
         self.bindings.pop_scope();
 
         (
             (
                 Function {
+                    attrs,
                     name: function.0.name.0,
                     params,
                     ty: ret_ty_type.0,

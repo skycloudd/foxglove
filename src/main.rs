@@ -181,7 +181,9 @@ fn run(input: &str, debug_ast: bool) -> Result<Spanned<TypedAst>, Vec<error::Err
         .unwrap_or((None, vec![]));
 
     if debug_ast {
-        print_tree(&AstNode::Ast(ast.as_ref().unwrap().0.clone())).unwrap();
+        if let Some(ast) = &ast {
+            print_tree(&AstNode::Ast(ast.0.clone())).unwrap();
+        }
     }
 
     let (typed_ast, tc_errs) = ast

@@ -8,7 +8,7 @@ pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
     let literal = text::int(10).from_str().unwrapped().map(Token::Int).boxed();
 
-    let unit = just("#").to(Token::Unit).boxed();
+    let hash = just("#").to(Token::Hash).boxed();
 
     let op = choice((
         just("==").to(Operator::Equals),
@@ -58,7 +58,7 @@ pub fn lexer<'src>(
         })
         .boxed();
 
-    let token = choice((literal, unit, op, control, ident)).boxed();
+    let token = choice((literal, hash, op, control, ident)).boxed();
 
     let comment = just("//")
         .then(any().and_is(just('\n').not()).repeated())

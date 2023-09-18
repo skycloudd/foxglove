@@ -64,9 +64,22 @@ impl<'a> Codegen<'a> {
 
                     translator.builder.finalize();
 
+                    let is_export = function
+                        .attrs
+                        .iter()
+                        .any(|attr| attr.kind == AttrKind::Export && attr.value.is_none());
+
                     let id = self
                         .module
-                        .declare_function(name, Linkage::Export, &self.ctx.func.signature)
+                        .declare_function(
+                            name,
+                            if is_export || name == "main" {
+                                Linkage::Export
+                            } else {
+                                Linkage::Local
+                            },
+                            &self.ctx.func.signature,
+                        )
                         .unwrap();
 
                     self.module.define_function(id, &mut self.ctx).unwrap();

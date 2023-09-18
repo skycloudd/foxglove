@@ -12,10 +12,23 @@ pub enum TopLevel<'src> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Function<'src> {
+    pub attrs: Vec<Attr<'src>>,
     pub name: &'src str,
     pub params: Vec<Param<'src>>,
     pub ty: Type,
     pub body: Vec<Statement<'src>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Attr<'src> {
+    pub kind: AttrKind,
+    pub value: Option<Expr<'src>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AttrKind {
+    Error,
+    Export,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
