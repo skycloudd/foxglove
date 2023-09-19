@@ -14,7 +14,7 @@ impl<'a> Codegen<'a> {
         Self {
             builder_ctx: FunctionBuilderContext::new(),
             ctx: module.make_context(),
-            module: module,
+            module,
         }
     }
 
@@ -49,16 +49,7 @@ impl<'a> Codegen<'a> {
 
                     builder.seal_block(entry_block);
 
-                    let mut translator = FunctionTranslator {
-                        builder,
-                        module: &mut *self.module,
-                        vars: HashMap::new(),
-                        var_index: 0,
-                        loop_block: None,
-                        loop_exit_block: None,
-                        did_break_or_continue: false,
-                        did_return: false,
-                    };
+                    let mut translator = FunctionTranslator::new(builder, &mut *self.module);
 
                     translator.translate(function.body, entry_block, function.params);
 
@@ -69,11 +60,13 @@ impl<'a> Codegen<'a> {
                         .iter()
                         .any(|attr| attr.kind == AttrKind::Export && attr.value.is_none());
 
+                    let is_main = name == "main";
+
                     let id = self
                         .module
                         .declare_function(
                             name,
-                            if is_export || name == "main" {
+                            if is_export || is_main {
                                 Linkage::Export
                             } else {
                                 Linkage::Local
@@ -84,7 +77,7 @@ impl<'a> Codegen<'a> {
 
                     self.module.define_function(id, &mut self.ctx).unwrap();
 
-                    if name == "main" {
+                    if is_main {
                         main_id = Some(id);
                     }
 
@@ -109,6 +102,19 @@ struct FunctionTranslator<'a, 'src: 'a> {
 }
 
 impl<'a, 'src> FunctionTranslator<'a, 'src> {
+    fn new(builder: FunctionBuilder<'a>, module: &'a mut dyn Module) -> Self {
+        Self {
+            builder,
+            module,
+            vars: HashMap::new(),
+            var_index: 0,
+            loop_block: None,
+            loop_exit_block: None,
+            did_break_or_continue: false,
+            did_return: false,
+        }
+    }
+
     fn translate(
         &mut self,
         statements: Vec<Statement<'src>>,

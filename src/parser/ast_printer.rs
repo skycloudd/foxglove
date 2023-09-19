@@ -231,7 +231,7 @@ impl TreeItem for AstNode<'_> {
                 .map(|statement| statement.clone().into())
                 .collect(),
             AstNode::Param(param) => {
-                vec![param.name.0.to_string().into(), param.ty.0.clone().into()]
+                vec![param.name.0.to_string().into(), param.ty.0.into()]
             }
             AstNode::Statement(statement) => match statement {
                 Statement::Error => vec![],
@@ -245,7 +245,7 @@ impl TreeItem for AstNode<'_> {
                     let mut vec = vec![AstNode::Var(name.0.to_string())];
 
                     if let Some(ty) = ty {
-                        vec.push(ty.0.clone().into());
+                        vec.push(ty.0.into());
                     }
 
                     vec.push(value.0.clone().into());
@@ -285,21 +285,17 @@ impl TreeItem for AstNode<'_> {
             AstNode::Expr(expr) => match expr {
                 Expr::Error => vec![],
                 Expr::Var(var) => vec![var.0.to_string().into()],
-                Expr::Literal(literal) => vec![literal.0.clone().into()],
-                Expr::Prefix { op, expr } => vec![op.0.clone().into(), expr.0.clone().into()],
+                Expr::Literal(literal) => vec![literal.0.into()],
+                Expr::Prefix { op, expr } => vec![op.0.into(), expr.0.clone().into()],
                 Expr::Binary { op, lhs, rhs } => {
-                    vec![
-                        op.0.clone().into(),
-                        lhs.0.clone().into(),
-                        rhs.0.clone().into(),
-                    ]
+                    vec![op.0.into(), lhs.0.clone().into(), rhs.0.clone().into()]
                 }
                 Expr::Call { name, args } => {
                     vec![
                         name.0.to_string().into(),
                         args.0
                             .iter()
-                            .map(|arg| arg.0.clone().into())
+                            .map(|arg| arg.0.clone())
                             .collect::<Vec<Expr>>()
                             .into(),
                     ]
