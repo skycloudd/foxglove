@@ -71,7 +71,7 @@ fn main() {
         .with_module_level(
             "cranelift",
             if args.debug_cranelift {
-                log::LevelFilter::Info
+                log::LevelFilter::Debug
             } else {
                 log::LevelFilter::Warn
             },
