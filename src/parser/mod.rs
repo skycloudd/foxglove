@@ -9,12 +9,11 @@ pub mod ast_printer;
 
 type ParserInput<'tokens, 'src> = SpannedInput<Token<'src>, Span, &'tokens [(Token<'src>, Span)]>;
 
-pub fn parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Ast<'src>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+type ParserError<'tokens, 'src> = extra::Err<Rich<'tokens, Token<'src>, Span>>;
+
+pub fn parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Ast<'src>>, ParserError<'tokens, 'src>>
+{
     program_parser()
         .map_with_span(|toplevels, span| (Ast { toplevels }, span))
         .boxed()
@@ -24,7 +23,7 @@ fn program_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
     Spanned<Vec<Spanned<TopLevel<'src>>>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+    ParserError<'tokens, 'src>,
 > {
     let function =
         function_parser().map_with_span(|function, span| (TopLevel::Function(function), span));
@@ -39,12 +38,9 @@ fn program_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         .boxed()
 }
 
-fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Function<'src>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn function_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Function<'src>>, ParserError<'tokens, 'src>>
+{
     let body = (statement_parser()
         .repeated()
         .collect()
@@ -96,12 +92,9 @@ fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         )
 }
 
-fn extern_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Extern<'src>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn extern_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Extern<'src>>, ParserError<'tokens, 'src>>
+{
     attrs_parser()
         .then_ignore(just(Token::Keyword(Keyword::Extern)))
         .then(ident_parser())
@@ -126,7 +119,7 @@ fn attrs_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
     Spanned<Vec<Spanned<Attr<'src>>>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+    ParserError<'tokens, 'src>,
 > {
     attr_parser()
         .repeated()
@@ -135,12 +128,9 @@ fn attrs_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         .boxed()
 }
 
-fn attr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Attr<'src>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn attr_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Attr<'src>>, ParserError<'tokens, 'src>>
+{
     just(Token::Hash)
         .ignore_then(
             ident_parser()
@@ -162,7 +152,7 @@ fn params_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
     Spanned<Vec<Spanned<Param<'src>>>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+    ParserError<'tokens, 'src>,
 > {
     param_parser()
         .separated_by(just(Token::Control(Control::Comma)))
@@ -190,12 +180,9 @@ fn params_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         )))
 }
 
-fn param_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Param<'src>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn param_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Param<'src>>, ParserError<'tokens, 'src>>
+{
     ident_parser()
         .then_ignore(just(Token::Control(Control::Colon)))
         .then(type_parser())
@@ -203,12 +190,9 @@ fn param_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         .boxed()
 }
 
-fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Statement<'src>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn statement_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Statement<'src>>, ParserError<'tokens, 'src>>
+{
     recursive(|statement| {
         let expr = expression_parser()
             .then_ignore(just(Token::Control(Control::Semicolon)))
@@ -333,12 +317,9 @@ fn statement_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     })
 }
 
-fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Expr<'src>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn expression_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Expr<'src>>, ParserError<'tokens, 'src>>
+{
     recursive(|expression| {
         let call = ident_parser()
             .then(
@@ -556,12 +537,9 @@ fn expression_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     })
 }
 
-fn literal_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Literal>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn literal_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Literal>, ParserError<'tokens, 'src>>
+{
     select! {
         Token::Int(n) => Literal::Int(n),
         Token::Keyword(Keyword::True) => Literal::Bool(true),
@@ -572,23 +550,16 @@ fn literal_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     .boxed()
 }
 
-fn ident_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<&'src str>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn ident_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<&'src str>, ParserError<'tokens, 'src>>
+{
     select! { Token::Ident(ident) => ident }
         .map_with_span(|ident, span| (ident, span))
         .boxed()
 }
 
-fn type_parser<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Spanned<Type>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> {
+fn type_parser<'tokens, 'src: 'tokens>(
+) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Type>, ParserError<'tokens, 'src>> {
     select! {
         Token::Ident("int") => Type::Int,
         Token::Ident("bool") => Type::Bool,
