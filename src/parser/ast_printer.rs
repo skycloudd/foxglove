@@ -7,6 +7,7 @@ pub enum AstNode<'src> {
     Ast(Ast<'src>),
     TopLevel(TopLevel<'src>),
     Function(Function<'src>),
+    Extern(Extern<'src>),
     Body(Vec<Statement<'src>>),
     Param(Param<'src>),
     Statement(Statement<'src>),
@@ -34,6 +35,12 @@ impl<'src> From<TopLevel<'src>> for AstNode<'src> {
 impl<'src> From<Function<'src>> for AstNode<'src> {
     fn from(function: Function<'src>) -> AstNode<'src> {
         Self::Function(function)
+    }
+}
+
+impl<'src> From<Extern<'src>> for AstNode<'src> {
+    fn from(extern_: Extern<'src>) -> AstNode<'src> {
+        Self::Extern(extern_)
     }
 }
 
@@ -156,6 +163,18 @@ impl TreeItem for AstNode<'_> {
                         .join(", "),
                     function.ty.0
                 ),
+                AstNode::Extern(extern_) => format!(
+                    "Extern [{}({}): {}]",
+                    extern_.name.0,
+                    extern_
+                        .params
+                        .0
+                        .iter()
+                        .map(|param| format!("{}: {}", param.0.name.0, param.0.ty.0))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    extern_.ty.0
+                ),
                 AstNode::Body(_) => "Body".to_string(),
                 AstNode::Param(_) => "Param".to_string(),
                 AstNode::Statement(statement) => match statement {
@@ -206,6 +225,7 @@ impl TreeItem for AstNode<'_> {
                 .collect(),
             AstNode::TopLevel(toplevel) => match toplevel {
                 TopLevel::Function(function) => vec![function.0.clone().into()],
+                TopLevel::Extern(extern_) => vec![extern_.0.clone().into()],
             },
             AstNode::Function(function) => {
                 let attrs = function
@@ -225,6 +245,17 @@ impl TreeItem for AstNode<'_> {
                     .into();
 
                 vec![attrs, body]
+            }
+            AstNode::Extern(extern_) => {
+                let attrs = extern_
+                    .attrs
+                    .0
+                    .iter()
+                    .map(|attr| attr.0.clone())
+                    .collect::<Vec<_>>()
+                    .into();
+
+                vec![attrs]
             }
             AstNode::Body(body) => body
                 .iter()

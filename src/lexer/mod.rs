@@ -54,6 +54,7 @@ pub fn lexer<'src>(
             "else" => Token::Keyword(Keyword::Else),
             "while" => Token::Keyword(Keyword::While),
             "func" => Token::Keyword(Keyword::Func),
+            "extern" => Token::Keyword(Keyword::Extern),
             _ => Token::Ident(ident),
         })
         .boxed();

@@ -51,6 +51,88 @@ impl<'a> Typechecker<'a> {
 
                     errors.extend(tc_errs);
                 }
+                ast::TopLevel::Extern(extern_) => {
+                    let name = extern_.0.name.0;
+
+                    let mut attrs = vec![];
+
+                    for attr in extern_.0.attrs.0 {
+                        let value = attr.0.value.as_ref().map(|value| {
+                            match self.typecheck_expr(value.clone()) {
+                                Ok(value) => value.0,
+                                Err(err) => {
+                                    errors.push(err);
+
+                                    Expr {
+                                        expr: ExprKind::Error,
+                                        ty: Type::Unit,
+                                    }
+                                }
+                            }
+                        });
+
+                        let kind = match attr.0.name.0 {
+                            "export" => AttrKind::Export,
+                            _ => {
+                                errors.push(
+                                    TypecheckError::UnknownAttribute {
+                                        span: attr.0.name.1,
+                                        name: attr.0.name.0.to_string(),
+                                    }
+                                    .into(),
+                                );
+
+                                AttrKind::Error
+                            }
+                        };
+
+                        match kind {
+                            AttrKind::Error => {}
+                            AttrKind::Export => {
+                                if let Some((_, span)) = attr.0.value {
+                                    errors.push(
+                                        TypecheckError::AttributeHasValue {
+                                            span,
+                                            name: attr.0.name.0.to_string(),
+                                        }
+                                        .into(),
+                                    );
+                                }
+                            }
+                        }
+
+                        attrs.push(Attr { kind, value });
+                    }
+
+                    let mut params = vec![];
+                    let mut param_types = vec![];
+
+                    for param in &extern_.0.params.0 {
+                        let ty = self.lower_type(param.0.ty);
+                        let ty_id = self.engine.insert(type_to_typeinfo(ty));
+
+                        params.push(Param {
+                            name: param.0.name.0,
+                            ty: ty.0,
+                        });
+
+                        param_types.push(ty_id);
+                    }
+
+                    let ret_ty = self.lower_type(extern_.0.ty);
+                    let ret_ty_id = self.engine.insert(type_to_typeinfo(ret_ty));
+
+                    let extern_ = Extern {
+                        attrs,
+                        name,
+                        params,
+                        ty: ret_ty.0,
+                    };
+
+                    toplevels.insert(name, TopLevel::Extern(extern_));
+
+                    self.fns.insert(name, (param_types, ret_ty_id));
+                }
             }
         }
 

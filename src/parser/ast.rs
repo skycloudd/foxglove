@@ -8,6 +8,7 @@ pub struct Ast<'src> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TopLevel<'src> {
     Function(s!(Function<'src>)),
+    Extern(s!(Extern<'src>)),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -17,6 +18,14 @@ pub struct Function<'src> {
     pub params: s!(Vec<s!(Param<'src>)>),
     pub ty: s!(Type),
     pub body: s!(Vec<s!(Statement<'src>)>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Extern<'src> {
+    pub attrs: s!(Vec<s!(Attr<'src>)>),
+    pub name: s!(&'src str),
+    pub params: s!(Vec<s!(Param<'src>)>),
+    pub ty: s!(Type),
 }
 
 #[derive(Clone, Debug, PartialEq)]

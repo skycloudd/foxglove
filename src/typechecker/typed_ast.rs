@@ -8,6 +8,7 @@ pub struct TypedAst<'src> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TopLevel<'src> {
     Function(Function<'src>),
+    Extern(Extern<'src>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -17,6 +18,14 @@ pub struct Function<'src> {
     pub params: Vec<Param<'src>>,
     pub ty: Type,
     pub body: Vec<Statement<'src>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Extern<'src> {
+    pub attrs: Vec<Attr<'src>>,
+    pub name: &'src str,
+    pub params: Vec<Param<'src>>,
+    pub ty: Type,
 }
 
 #[derive(Clone, Debug, PartialEq)]

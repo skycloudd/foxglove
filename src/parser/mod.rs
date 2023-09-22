@@ -26,12 +26,16 @@ fn program_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     Spanned<Vec<Spanned<TopLevel<'src>>>>,
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > {
-    function_parser()
-        .map_with_span(|function, span| (TopLevel::Function(function), span))
+    let function =
+        function_parser().map_with_span(|function, span| (TopLevel::Function(function), span));
+
+    let extern_ = extern_parser().map_with_span(|extern_, span| (TopLevel::Extern(extern_), span));
+
+    choice((function, extern_))
         .repeated()
         .collect()
         .then_ignore(end())
-        .map_with_span(|functions, span| (functions, span))
+        .map_with_span(|toplevels, span| (toplevels, span))
         .boxed()
 }
 
@@ -133,6 +137,75 @@ fn function_parser<'tokens, 'src: 'tokens>() -> impl Parser<
                 )
             },
         )
+}
+
+fn extern_parser<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    ParserInput<'tokens, 'src>,
+    Spanned<Extern<'src>>,
+    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+> {
+    let attr_parser = just(Token::Hash).ignore_then(
+        ident_parser()
+            .then(
+                just(Token::Control(Control::Equals))
+                    .ignore_then(expression_parser())
+                    .or_not(),
+            )
+            .delimited_by(
+                just(Token::Control(Control::LeftSquare)),
+                just(Token::Control(Control::RightSquare)),
+            )
+            .map_with_span(|(name, value), span| (Attr { name, value }, span))
+            .boxed(),
+    );
+
+    attr_parser
+        .repeated()
+        .collect()
+        .map_with_span(|attrs, span| (attrs, span))
+        .then_ignore(just(Token::Keyword(Keyword::Extern)))
+        .then(ident_parser())
+        .then(
+            param_parser()
+                .separated_by(just(Token::Control(Control::Comma)))
+                .allow_trailing()
+                .collect()
+                .delimited_by(
+                    just(Token::Control(Control::LeftParen)),
+                    just(Token::Control(Control::RightParen)),
+                )
+                .map_with_span(|params, span| (params, span))
+                .recover_with(via_parser(nested_delimiters(
+                    Token::Control(Control::LeftParen),
+                    Token::Control(Control::RightParen),
+                    [
+                        (
+                            Token::Control(Control::LeftCurly),
+                            Token::Control(Control::RightCurly),
+                        ),
+                        (
+                            Token::Control(Control::LeftSquare),
+                            Token::Control(Control::RightSquare),
+                        ),
+                    ],
+                    |span| (vec![], span),
+                ))),
+        )
+        .then_ignore(just(Token::Control(Control::Colon)))
+        .then(type_parser())
+        .then_ignore(just(Token::Control(Control::Semicolon)))
+        .map_with_span(|(((attrs, name), params), ty), span| {
+            (
+                Extern {
+                    attrs,
+                    name,
+                    params,
+                    ty,
+                },
+                span,
+            )
+        })
 }
 
 fn param_parser<'tokens, 'src: 'tokens>() -> impl Parser<

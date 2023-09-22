@@ -100,6 +100,7 @@ pub enum Keyword {
     Else,
     While,
     Func,
+    Extern,
 }
 
 impl std::fmt::Display for Keyword {
@@ -116,6 +117,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Else => write!(f, "else"),
             Keyword::While => write!(f, "while"),
             Keyword::Func => write!(f, "func"),
+            Keyword::Extern => write!(f, "extern"),
         }
     }
 }

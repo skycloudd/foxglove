@@ -83,6 +83,22 @@ impl<'a> Codegen<'a> {
 
                     self.module.clear_context(&mut self.ctx);
                 }
+                TopLevel::Extern(extern_) => {
+                    let mut sig = self.module.make_signature();
+
+                    for param in &extern_.params {
+                        sig.params.push(AbiParam::new(param.ty.into()));
+                    }
+
+                    sig.returns.push(AbiParam::new(extern_.ty.into()));
+
+                    let _id = self
+                        .module
+                        .declare_function(name, Linkage::Import, &sig)
+                        .unwrap();
+
+                    self.module.clear_context(&mut self.ctx);
+                }
             }
         }
 

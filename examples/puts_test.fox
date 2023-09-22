@@ -1,0 +1,6 @@
+extern puts(s: int): int;
+
+func main(): int {
+    puts(1);
+    0
+}
