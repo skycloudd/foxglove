@@ -88,8 +88,8 @@ fn main() {
             info!("Compiling {}", short_filename);
 
             match run(&input, args.debug_ast) {
-                Ok((typed_ast, _)) => {
-                    let jit_main = jit(typed_ast, opt);
+                (Some(typed_ast), errs) if errs.is_empty() => {
+                    let jit_main = jit(typed_ast.0, opt);
 
                     info!("Finished");
 
@@ -101,8 +101,8 @@ fn main() {
 
                     std::process::exit(exit_code);
                 }
-                Err(e) => {
-                    print_errors(e, &input);
+                (_, errs) => {
+                    print_errors(errs, &input);
 
                     error!("Failed to compile {}", short_filename);
 
@@ -119,8 +119,8 @@ fn main() {
             info!("Compiling {}", short_filename);
 
             match run(&input, args.debug_ast) {
-                Ok((typed_ast, _)) => {
-                    let obj = object(typed_ast, opt);
+                (Some(typed_ast), errs) if errs.is_empty() => {
+                    let obj = object(typed_ast.0, opt);
 
                     let data = obj.emit().unwrap();
 
@@ -167,8 +167,8 @@ fn main() {
                         std::process::exit(1);
                     }
                 }
-                Err(e) => {
-                    print_errors(e, &input);
+                (_, errs) => {
+                    print_errors(errs, &input);
 
                     error!("Failed to compile {}", short_filename);
 
@@ -179,7 +179,7 @@ fn main() {
     }
 }
 
-fn run(input: &str, debug_ast: bool) -> Result<Spanned<TypedAst>, Vec<error::Error>> {
+fn run(input: &str, debug_ast: bool) -> (Option<Spanned<TypedAst>>, Vec<error::Error>) {
     let (tokens, lex_errs) = lexer().parse(input).into_output_errors();
 
     let (ast, parse_errs) = tokens
@@ -198,9 +198,10 @@ fn run(input: &str, debug_ast: bool) -> Result<Spanned<TypedAst>, Vec<error::Err
     }
 
     let (typed_ast, tc_errs) = ast
-        .map(|ast| match typecheck(ast) {
-            Ok(typed_ast) => (Some(typed_ast), vec![]),
-            Err(tc_errs) => (None, tc_errs),
+        .map(|ast| {
+            let (typed_ast, errs) = typecheck(ast);
+
+            (Some(typed_ast), errs)
         })
         .unwrap_or((None, vec![]));
 
@@ -221,11 +222,7 @@ fn run(input: &str, debug_ast: bool) -> Result<Spanned<TypedAst>, Vec<error::Err
         .chain(tc_errs)
         .collect::<Vec<_>>();
 
-    if errs.is_empty() {
-        Ok(typed_ast.unwrap())
-    } else {
-        Err(errs)
-    }
+    (typed_ast, errs)
 }
 
 fn object(typed_ast: TypedAst, opt: OptLevel) -> ObjectProduct {

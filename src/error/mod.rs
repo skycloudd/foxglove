@@ -1,6 +1,6 @@
 use crate::typechecker::{
+    engine::TypeInfo,
     typed_ast::{BinOp, PrefixOp, Type},
-    TypeInfo,
 };
 use crate::{Span, Spanned};
 use ariadne::{Color, Fmt};
@@ -90,6 +90,7 @@ impl Error {
                 TypecheckError::BreakOutsideOfLoop(_) => 13,
                 TypecheckError::UnknownAttribute { .. } => 14,
                 TypecheckError::AttributeHasValue { .. } => 15,
+                TypecheckError::MainFunctionCannotBeExtern(_) => 16,
             },
             Error::ExpectedFound { .. } => 1,
             Error::Custom(_, _) => 0,
@@ -152,6 +153,7 @@ pub enum TypecheckError {
         span: Span,
         name: String,
     },
+    MainFunctionCannotBeExtern(Span),
 }
 
 impl TypecheckError {
@@ -322,6 +324,14 @@ impl TypecheckError {
                     *span,
                 )],
                 Some(format!("help: try `#[{}]`", name)),
+            ),
+            TypecheckError::MainFunctionCannotBeExtern(span) => (
+                "Main function cannot be extern".to_string(),
+                vec![(
+                    ("Main function cannot be extern".to_string(), Color::Yellow),
+                    *span,
+                )],
+                None,
             ),
         }
     }

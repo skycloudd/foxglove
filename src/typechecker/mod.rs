@@ -1,3 +1,4 @@
+use self::engine::{type_to_typeinfo, Engine, TypeId};
 use self::typed_ast::*;
 use crate::error::{Error, TypecheckError};
 use crate::parser::ast::{self, Ast};
@@ -5,12 +6,11 @@ use crate::Spanned;
 use std::collections::HashMap;
 use std::hash::Hash;
 
+pub mod engine;
 pub mod typed_ast;
 
-pub fn typecheck(ast: Spanned<Ast>) -> Result<Spanned<TypedAst>, Vec<Error>> {
-    let mut checker = Typechecker::new();
-
-    checker.typecheck_ast(ast)
+pub fn typecheck(ast: Spanned<Ast>) -> (Spanned<TypedAst>, Vec<Error>) {
+    Typechecker::new().typecheck_ast(ast)
 }
 
 struct Typechecker<'a> {
@@ -35,103 +35,27 @@ impl<'a> Typechecker<'a> {
     fn typecheck_ast<'src: 'a>(
         &mut self,
         ast: Spanned<Ast<'src>>,
-    ) -> Result<Spanned<TypedAst<'src>>, Vec<Error>> {
+    ) -> (Spanned<TypedAst<'src>>, Vec<Error>) {
         let mut toplevels = HashMap::new();
         let mut errors = vec![];
 
         for toplevel in ast.0.toplevels.0 {
             match toplevel.0 {
                 ast::TopLevel::Function(function) => {
-                    let name = function.0.name.0;
-                    self.current_fn = Some(name);
+                    self.current_fn = Some(function.0.name.0);
 
                     let (func, tc_errs) = self.typecheck_function(function);
 
-                    toplevels.insert(name, TopLevel::Function(func.0));
+                    toplevels.insert(func.0.name, TopLevel::Function(func.0));
 
                     errors.extend(tc_errs);
                 }
                 ast::TopLevel::Extern(extern_) => {
-                    let name = extern_.0.name.0;
+                    let (extern_, tc_errs) = self.typecheck_extern(extern_);
 
-                    let mut attrs = vec![];
+                    toplevels.insert(extern_.0.name, TopLevel::Extern(extern_.0));
 
-                    for attr in extern_.0.attrs.0 {
-                        let value = attr.0.value.as_ref().map(|value| {
-                            match self.typecheck_expr(value.clone()) {
-                                Ok(value) => value.0,
-                                Err(err) => {
-                                    errors.push(err);
-
-                                    Expr {
-                                        expr: ExprKind::Error,
-                                        ty: Type::Unit,
-                                    }
-                                }
-                            }
-                        });
-
-                        let kind = match attr.0.name.0 {
-                            "export" => AttrKind::Export,
-                            _ => {
-                                errors.push(
-                                    TypecheckError::UnknownAttribute {
-                                        span: attr.0.name.1,
-                                        name: attr.0.name.0.to_string(),
-                                    }
-                                    .into(),
-                                );
-
-                                AttrKind::Error
-                            }
-                        };
-
-                        match kind {
-                            AttrKind::Error => {}
-                            AttrKind::Export => {
-                                if let Some((_, span)) = attr.0.value {
-                                    errors.push(
-                                        TypecheckError::AttributeHasValue {
-                                            span,
-                                            name: attr.0.name.0.to_string(),
-                                        }
-                                        .into(),
-                                    );
-                                }
-                            }
-                        }
-
-                        attrs.push(Attr { kind, value });
-                    }
-
-                    let mut params = vec![];
-                    let mut param_types = vec![];
-
-                    for param in &extern_.0.params.0 {
-                        let ty = self.lower_type(param.0.ty);
-                        let ty_id = self.engine.insert(type_to_typeinfo(ty));
-
-                        params.push(Param {
-                            name: param.0.name.0,
-                            ty: ty.0,
-                        });
-
-                        param_types.push(ty_id);
-                    }
-
-                    let ret_ty = self.lower_type(extern_.0.ty);
-                    let ret_ty_id = self.engine.insert(type_to_typeinfo(ret_ty));
-
-                    let extern_ = Extern {
-                        attrs,
-                        name,
-                        params,
-                        ty: ret_ty.0,
-                    };
-
-                    toplevels.insert(name, TopLevel::Extern(extern_));
-
-                    self.fns.insert(name, (param_types, ret_ty_id));
+                    errors.extend(tc_errs);
                 }
             }
         }
@@ -142,11 +66,7 @@ impl<'a> Typechecker<'a> {
             errors.push(TypecheckError::MissingMainFunction((ast.1.end..ast.1.end).into()).into());
         }
 
-        if errors.is_empty() {
-            Ok((TypedAst { toplevels }, ast.1))
-        } else {
-            Err(errors)
-        }
+        ((TypedAst { toplevels }, ast.1), errors)
     }
 
     fn typecheck_function<'src: 'a>(
@@ -256,14 +176,10 @@ impl<'a> Typechecker<'a> {
         let mut body = vec![];
 
         for stmt in function.0.body.0 {
-            body.push(match self.typecheck_statement(stmt) {
-                Ok(stmt) => stmt.0,
-                Err(err) => {
-                    errors.push(err);
-
-                    Statement::Error
-                }
-            });
+            match self.typecheck_statement(stmt) {
+                Ok(stmt) => body.push(stmt.0),
+                Err(err) => errors.push(err),
+            }
         }
 
         self.bindings.pop_scope();
@@ -278,6 +194,102 @@ impl<'a> Typechecker<'a> {
                     body,
                 },
                 function.1,
+            ),
+            errors,
+        )
+    }
+
+    fn typecheck_extern<'src: 'a>(
+        &mut self,
+        extern_: Spanned<ast::Extern<'src>>,
+    ) -> (Spanned<Extern<'src>>, Vec<Error>) {
+        let mut errors = vec![];
+
+        let mut attrs = vec![];
+
+        for attr in extern_.0.attrs.0 {
+            let value =
+                attr.0
+                    .value
+                    .as_ref()
+                    .map(|value| match self.typecheck_expr(value.clone()) {
+                        Ok(value) => value.0,
+                        Err(err) => {
+                            errors.push(err);
+
+                            Expr {
+                                expr: ExprKind::Error,
+                                ty: Type::Unit,
+                            }
+                        }
+                    });
+
+            let kind = match attr.0.name.0 {
+                "export" => AttrKind::Export,
+                _ => {
+                    errors.push(
+                        TypecheckError::UnknownAttribute {
+                            span: attr.0.name.1,
+                            name: attr.0.name.0.to_string(),
+                        }
+                        .into(),
+                    );
+
+                    AttrKind::Error
+                }
+            };
+
+            match kind {
+                AttrKind::Error => {}
+                AttrKind::Export => {
+                    if let Some((_, span)) = attr.0.value {
+                        errors.push(
+                            TypecheckError::AttributeHasValue {
+                                span,
+                                name: attr.0.name.0.to_string(),
+                            }
+                            .into(),
+                        );
+                    }
+                }
+            }
+
+            attrs.push(Attr { kind, value });
+        }
+
+        let mut params = vec![];
+        let mut param_types = vec![];
+
+        for param in &extern_.0.params.0 {
+            let ty = self.lower_type(param.0.ty);
+            let ty_id = self.engine.insert(type_to_typeinfo(ty));
+
+            param_types.push(ty_id);
+
+            params.push(Param {
+                name: param.0.name.0,
+                ty: ty.0,
+            });
+        }
+
+        let ret_ty_type = self.lower_type(extern_.0.ty);
+        let ret_ty = self.engine.insert(type_to_typeinfo(ret_ty_type));
+
+        if extern_.0.name.0 == "main" {
+            errors.push(TypecheckError::MainFunctionCannotBeExtern(extern_.0.name.1).into());
+        }
+
+        self.fns.insert(extern_.0.name.0, (param_types, ret_ty));
+
+        (
+            (
+                Extern {
+                    attrs,
+                    name: extern_.0.name.0,
+                    params,
+                    ty: ret_ty_type.0,
+                },
+                extern_.1,
             ),
             errors,
         )
@@ -624,100 +636,6 @@ impl<'a> Typechecker<'a> {
             ty.1,
         )
     }
-}
-
-struct Engine {
-    id_counter: usize,
-    vars: HashMap<TypeId, Spanned<TypeInfo>>,
-}
-
-impl Engine {
-    fn new() -> Self {
-        Self {
-            id_counter: 0,
-            vars: HashMap::new(),
-        }
-    }
-
-    fn insert(&mut self, info: Spanned<TypeInfo>) -> TypeId {
-        self.id_counter += 1;
-        let id = self.id_counter;
-        self.vars.insert(id, info);
-        id
-    }
-
-    fn unify(&mut self, a: TypeId, b: TypeId) -> Result<(), Error> {
-        let var_a = self.vars[&a];
-        let var_b = self.vars[&b];
-
-        match (var_a.0, var_b.0) {
-            (TypeInfo::Ref(a), _) => self.unify(a, b),
-            (_, TypeInfo::Ref(b)) => self.unify(a, b),
-
-            (TypeInfo::Unknown, _) => {
-                self.vars.insert(a, (TypeInfo::Ref(b), var_b.1));
-                Ok(())
-            }
-            (_, TypeInfo::Unknown) => {
-                self.vars.insert(b, (TypeInfo::Ref(a), var_a.1));
-                Ok(())
-            }
-
-            (TypeInfo::Int, TypeInfo::Int) => Ok(()),
-
-            (TypeInfo::Bool, TypeInfo::Bool) => Ok(()),
-
-            (TypeInfo::Unit, TypeInfo::Unit) => Ok(()),
-
-            (a, b) => Err(TypecheckError::TypeMismatch {
-                span1: var_a.1,
-                span2: var_b.1,
-                ty1: a,
-                ty2: b,
-            }
-            .into()),
-        }
-    }
-
-    fn reconstruct(&mut self, id: TypeId) -> Result<Spanned<Type>, Error> {
-        let var = self.vars[&id];
-
-        Ok((
-            match var.0 {
-                TypeInfo::Unknown => {
-                    return Err(TypecheckError::CannotInferType { span: var.1 }.into())
-                }
-                TypeInfo::Ref(id) => self.reconstruct(id)?.0,
-                TypeInfo::Int => Type::Int,
-                TypeInfo::Bool => Type::Bool,
-                TypeInfo::Unit => Type::Unit,
-            },
-            var.1,
-        ))
-    }
-}
-
-type TypeId = usize;
-
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum TypeInfo {
-    #[allow(dead_code)]
-    Unknown,
-    Ref(TypeId),
-    Int,
-    Bool,
-    Unit,
-}
-
-fn type_to_typeinfo(ty: Spanned<Type>) -> Spanned<TypeInfo> {
-    (
-        match ty.0 {
-            Type::Int => TypeInfo::Int,
-            Type::Bool => TypeInfo::Bool,
-            Type::Unit => TypeInfo::Unit,
-        },
-        ty.1,
-    )
 }
 
 #[derive(Clone, Debug)]
