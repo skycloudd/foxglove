@@ -109,6 +109,7 @@ impl<'a> Codegen<'a> {
 struct FunctionTranslator<'a, 'src: 'a> {
     builder: FunctionBuilder<'a>,
     module: &'a mut dyn Module,
+    // data_description: DataDescription,
     vars: HashMap<&'src str, Variable>,
     var_index: usize,
     loop_block: Option<Block>,
@@ -122,6 +123,7 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
         Self {
             builder,
             module,
+            // data_description: DataDescription::new(),
             vars: HashMap::new(),
             var_index: 0,
             loop_block: None,
@@ -291,8 +293,9 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
                 match op {
                     PrefixOp::Negate => match expr_ty {
                         typed_ast::Type::Int => self.builder.ins().ineg(translated_expr),
-                        typed_ast::Type::Bool => unreachable!(),
-                        typed_ast::Type::Unit => unreachable!(),
+                        typed_ast::Type::Bool | typed_ast::Type::Unit => {
+                            unreachable!()
+                        }
                     },
                 }
             }
@@ -408,6 +411,23 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
 
         var
     }
+
+    // pub fn create_data(&mut self, name: &str, contents: Vec<u8>) -> Result<(), String> {
+    //     self.data_description.define(contents.into_boxed_slice());
+
+    //     let id = self
+    //         .module
+    //         .declare_data(name, Linkage::Local, true, false)
+    //         .map_err(|e| e.to_string())?;
+
+    //     self.module
+    //         .define_data(id, &self.data_description)
+    //         .map_err(|e| e.to_string())?;
+
+    //     self.data_description.clear();
+
+    //     Ok(())
+    // }
 }
 
 impl From<typed_ast::Type> for types::Type {
