@@ -15,7 +15,7 @@ pub fn parser<'tokens, 'src: 'tokens>(
 ) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<Ast<'src>>, ParserError<'tokens, 'src>>
 {
     program_parser()
-        .map_with_span(|toplevels, span| (Ast { toplevels }, span))
+        .map_with(|toplevels, e| (Ast { toplevels }, e.span()))
         .boxed()
 }
 
@@ -26,15 +26,15 @@ fn program_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     ParserError<'tokens, 'src>,
 > {
     let function =
-        function_parser().map_with_span(|function, span| (TopLevel::Function(function), span));
+        function_parser().map_with(|function, e| (TopLevel::Function(function), e.span()));
 
-    let extern_ = extern_parser().map_with_span(|extern_, span| (TopLevel::Extern(extern_), span));
+    let extern_ = extern_parser().map_with(|extern_, e| (TopLevel::Extern(extern_), e.span()));
 
     choice((function, extern_))
         .repeated()
         .collect()
         .then_ignore(end())
-        .map_with_span(|toplevels, span| (toplevels, span))
+        .map_with(|toplevels, e| (toplevels, e.span()))
         .boxed()
 }
 
@@ -44,7 +44,7 @@ fn function_parser<'tokens, 'src: 'tokens>(
     let body = (statement_parser()
         .repeated()
         .collect()
-        .map_with_span(|body: Vec<Spanned<Statement>>, span| (body, span))
+        .map_with(|body: Vec<Spanned<Statement>>, e| (body, e.span()))
         .then(expression_parser().or_not()))
     .delimited_by(
         just(Token::Control(Control::LeftCurly)),
@@ -61,8 +61,8 @@ fn function_parser<'tokens, 'src: 'tokens>(
                 .or_not(),
         )
         .then(body)
-        .map_with_span(
-            |((((attrs, name), params), ty), (mut body, maybe_expr)), span| {
+        .map_with(
+            |((((attrs, name), params), ty), (mut body, maybe_expr)), e| {
                 body.0.push(match maybe_expr {
                     Some(expr) => (Statement::Return(Some(expr.clone())), expr.1),
                     None => {
@@ -86,7 +86,7 @@ fn function_parser<'tokens, 'src: 'tokens>(
                         },
                         body,
                     },
-                    span,
+                    e.span(),
                 )
             },
         )
@@ -102,7 +102,7 @@ fn extern_parser<'tokens, 'src: 'tokens>(
         .then_ignore(just(Token::Control(Control::Colon)))
         .then(type_parser())
         .then_ignore(just(Token::Control(Control::Semicolon)))
-        .map_with_span(|(((attrs, name), params), ty), span| {
+        .map_with(|(((attrs, name), params), ty), e| {
             (
                 Extern {
                     attrs,
@@ -110,7 +110,7 @@ fn extern_parser<'tokens, 'src: 'tokens>(
                     params,
                     ty,
                 },
-                span,
+                e.span(),
             )
         })
 }
@@ -124,7 +124,7 @@ fn attrs_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     attr_parser()
         .repeated()
         .collect()
-        .map_with_span(|attrs, span| (attrs, span))
+        .map_with(|attrs, e| (attrs, e.span()))
         .boxed()
 }
 
@@ -144,7 +144,7 @@ fn attr_parser<'tokens, 'src: 'tokens>(
                     just(Token::Control(Control::RightSquare)),
                 ),
         )
-        .map_with_span(|(name, value), span| (Attr { name, value }, span))
+        .map_with(|(name, value), e| (Attr { name, value }, e.span()))
         .boxed()
 }
 
@@ -162,7 +162,7 @@ fn params_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             just(Token::Control(Control::LeftParen)),
             just(Token::Control(Control::RightParen)),
         )
-        .map_with_span(|params, span| (params, span))
+        .map_with(|params, e| (params, e.span()))
         .recover_with(via_parser(nested_delimiters(
             Token::Control(Control::LeftParen),
             Token::Control(Control::RightParen),
@@ -186,7 +186,7 @@ fn param_parser<'tokens, 'src: 'tokens>(
     ident_parser()
         .then_ignore(just(Token::Control(Control::Colon)))
         .then(type_parser())
-        .map_with_span(|(name, ty), span| (Param { name, ty }, span))
+        .map_with(|(name, ty), e| (Param { name, ty }, e.span()))
         .boxed()
 }
 
@@ -207,7 +207,7 @@ fn statement_parser<'tokens, 'src: 'tokens>(
                 just(Token::Control(Control::LeftCurly)),
                 just(Token::Control(Control::RightCurly)),
             )
-            .map_with_span(|statements, span| (statements, span))
+            .map_with(|statements, e| (statements, e.span()))
             .map(Statement::Block)
             .boxed();
 
@@ -235,7 +235,7 @@ fn statement_parser<'tokens, 'src: 'tokens>(
             .ignore_then(
                 block
                     .clone()
-                    .map_with_span(|statements, span| (statements, span)),
+                    .map_with(|statements, e| (statements, e.span())),
             )
             .map(|body| Statement::Loop(Box::new(body)))
             .boxed();
@@ -261,13 +261,13 @@ fn statement_parser<'tokens, 'src: 'tokens>(
             .then(
                 block
                     .clone()
-                    .map_with_span(|statements, span| (statements, span)),
+                    .map_with(|statements, e| (statements, e.span())),
             )
             .then(
                 (just(Token::Keyword(Keyword::Else)).ignore_then(
                     block
                         .clone()
-                        .map_with_span(|statements, span| (statements, span)),
+                        .map_with(|statements, e| (statements, e.span())),
                 ))
                 .or_not(),
             )
@@ -312,7 +312,7 @@ fn statement_parser<'tokens, 'src: 'tokens>(
                 .ignored()
                 .or(end()),
         ))
-        .map_with_span(|statement, span| (statement, span))
+        .map_with(|statement, e| (statement, e.span()))
         .boxed()
     })
 }
@@ -332,20 +332,20 @@ fn expression_parser<'tokens, 'src: 'tokens>(
                         just(Token::Control(Control::LeftParen)),
                         just(Token::Control(Control::RightParen)),
                     )
-                    .map_with_span(|args, span| (args, span)),
+                    .map_with(|args, e| (args, e.span())),
             )
             .map(|(name, args)| Expr::Call { name, args })
-            .map_with_span(|expr, span| (expr, span))
+            .map_with(|expr, e| (expr, e.span()))
             .boxed();
 
         let var = ident_parser()
             .map(Expr::Var)
-            .map_with_span(|expr, span| (expr, span))
+            .map_with(|expr, e| (expr, e.span()))
             .boxed();
 
         let literal = literal_parser()
             .map(Expr::Literal)
-            .map_with_span(|expr, span| (expr, span))
+            .map_with(|expr, e| (expr, e.span()))
             .boxed();
 
         let parenthesized_expr = expression
@@ -359,7 +359,7 @@ fn expression_parser<'tokens, 'src: 'tokens>(
 
         let prefix_op = just(Token::Operator(Operator::Minus))
             .to(PrefixOp::Negate)
-            .map_with_span(|op, span| (op, span))
+            .map_with(|op, e| (op, e.span()))
             .boxed();
 
         let prefix = prefix_op
@@ -381,7 +381,7 @@ fn expression_parser<'tokens, 'src: 'tokens>(
             just(Token::Operator(Operator::Star)).to(BinOp::Multiply),
             just(Token::Operator(Operator::Slash)).to(BinOp::Divide),
         ))
-        .map_with_span(|op, span| (op, span))
+        .map_with(|op, e| (op, e.span()))
         .boxed();
 
         let factor = prefix
@@ -404,7 +404,7 @@ fn expression_parser<'tokens, 'src: 'tokens>(
             just(Token::Operator(Operator::Plus)).to(BinOp::Add),
             just(Token::Operator(Operator::Minus)).to(BinOp::Subtract),
         ))
-        .map_with_span(|op, span| (op, span))
+        .map_with(|op, e| (op, e.span()))
         .boxed();
 
         let sum = factor
@@ -429,7 +429,7 @@ fn expression_parser<'tokens, 'src: 'tokens>(
             just(Token::Operator(Operator::GreaterThan)).to(BinOp::GreaterThan),
             just(Token::Operator(Operator::GreaterThanOrEqual)).to(BinOp::GreaterThanOrEqual),
         ))
-        .map_with_span(|op, span| (op, span))
+        .map_with(|op, e| (op, e.span()))
         .boxed();
 
         let relational = sum
@@ -452,7 +452,7 @@ fn expression_parser<'tokens, 'src: 'tokens>(
             just(Token::Operator(Operator::Equals)).to(BinOp::Equals),
             just(Token::Operator(Operator::NotEquals)).to(BinOp::NotEquals),
         ))
-        .map_with_span(|op, span| (op, span))
+        .map_with(|op, e| (op, e.span()))
         .boxed();
 
         let equality = relational
@@ -473,7 +473,7 @@ fn expression_parser<'tokens, 'src: 'tokens>(
 
         let logical_and_op = just(Token::Operator(Operator::LogicalAnd))
             .to(BinOp::LogicalAnd)
-            .map_with_span(|op, span| (op, span))
+            .map_with(|op, e| (op, e.span()))
             .boxed();
 
         let logical_and = equality
@@ -497,7 +497,7 @@ fn expression_parser<'tokens, 'src: 'tokens>(
 
         let logical_or_op = just(Token::Operator(Operator::LogicalOr))
             .to(BinOp::LogicalOr)
-            .map_with_span(|op, span| (op, span))
+            .map_with(|op, e| (op, e.span()))
             .boxed();
 
         let logical_or = logical_and
@@ -546,7 +546,7 @@ fn literal_parser<'tokens, 'src: 'tokens>(
         Token::Keyword(Keyword::False) => Literal::Bool(false),
         Token::Hash => Literal::Unit,
     }
-    .map_with_span(|literal, span| (literal, span))
+    .map_with(|literal, e| (literal, e.span()))
     .boxed()
 }
 
@@ -554,7 +554,7 @@ fn ident_parser<'tokens, 'src: 'tokens>(
 ) -> impl Parser<'tokens, ParserInput<'tokens, 'src>, Spanned<&'src str>, ParserError<'tokens, 'src>>
 {
     select! { Token::Ident(ident) => ident }
-        .map_with_span(|ident, span| (ident, span))
+        .map_with(|ident, e| (ident, e.span()))
         .boxed()
 }
 
@@ -565,6 +565,6 @@ fn type_parser<'tokens, 'src: 'tokens>(
         Token::Ident("bool") => Type::Bool,
         Token::Hash => Type::Unit,
     }
-    .map_with_span(|ty, span| (ty, span))
+    .map_with(|ty, e| (ty, e.span()))
     .boxed()
 }
