@@ -314,6 +314,7 @@ fn statement_parser<'tokens, 'src: 'tokens>(
         ))
         .map_with(|statement, e| (statement, e.span()))
         .boxed()
+        .labelled("statement")
     })
 }
 
@@ -519,21 +520,23 @@ fn expression_parser<'tokens, 'src: 'tokens>(
             )
             .boxed();
 
-        logical_or.recover_with(via_parser(nested_delimiters(
-            Token::Control(Control::LeftParen),
-            Token::Control(Control::RightParen),
-            [
-                (
-                    Token::Control(Control::LeftCurly),
-                    Token::Control(Control::RightCurly),
-                ),
-                (
-                    Token::Control(Control::LeftSquare),
-                    Token::Control(Control::RightSquare),
-                ),
-            ],
-            |span| (Expr::Error, span),
-        )))
+        logical_or
+            .recover_with(via_parser(nested_delimiters(
+                Token::Control(Control::LeftParen),
+                Token::Control(Control::RightParen),
+                [
+                    (
+                        Token::Control(Control::LeftCurly),
+                        Token::Control(Control::RightCurly),
+                    ),
+                    (
+                        Token::Control(Control::LeftSquare),
+                        Token::Control(Control::RightSquare),
+                    ),
+                ],
+                |span| (Expr::Error, span),
+            )))
+            .labelled("expression")
     })
 }
 
@@ -556,6 +559,7 @@ fn ident_parser<'tokens, 'src: 'tokens>(
     select! { Token::Ident(ident) => ident }
         .map_with(|ident, e| (ident, e.span()))
         .boxed()
+        .labelled("name")
 }
 
 fn type_parser<'tokens, 'src: 'tokens>(
@@ -567,4 +571,5 @@ fn type_parser<'tokens, 'src: 'tokens>(
     }
     .map_with(|ty, e| (ty, e.span()))
     .boxed()
+    .labelled("type")
 }

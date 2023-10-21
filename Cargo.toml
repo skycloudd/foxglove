@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+chumsky = { version = "1.0.0-alpha.6", features = ["label"] }
 ariadne = "0.3.0"
-chumsky = "1.0.0-alpha.6"
 clap = { version = "4.4.3", features = ["derive"] }
 cranelift = "0.101.0"
 cranelift-jit = "0.101.0"
