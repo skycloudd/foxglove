@@ -41,6 +41,7 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Compile and run a program directly
     Run {
         /// Input file
         filename: PathBuf,
@@ -49,6 +50,7 @@ enum Command {
         /// Optimization level
         opt: OptLevel,
     },
+    /// Build a program into an executable
     Build {
         /// Input file
         filename: PathBuf,
