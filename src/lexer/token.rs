@@ -11,12 +11,12 @@ pub enum Token<'src> {
 impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::Int(n) => write!(f, "{}", n),
+            Token::Int(n) => write!(f, "{n}"),
             Token::Hash => write!(f, "#"),
-            Token::Operator(op) => write!(f, "{}", op),
-            Token::Control(ctrl) => write!(f, "{}", ctrl),
-            Token::Keyword(kw) => write!(f, "{}", kw),
-            Token::Ident(name) => write!(f, "{}", name),
+            Token::Operator(op) => write!(f, "{op}"),
+            Token::Control(ctrl) => write!(f, "{ctrl}"),
+            Token::Keyword(kw) => write!(f, "{kw}"),
+            Token::Ident(name) => write!(f, "{name}"),
         }
     }
 }

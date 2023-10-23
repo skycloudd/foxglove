@@ -1,4 +1,4 @@
-use self::token::*;
+use self::token::{Control, Keyword, Operator, Token};
 use crate::{Span, Spanned};
 use chumsky::prelude::*;
 

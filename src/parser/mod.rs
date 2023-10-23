@@ -1,4 +1,6 @@
-use self::ast::*;
+use self::ast::{
+    Ast, Attr, BinOp, Expr, Extern, Function, Literal, Param, PrefixOp, Statement, TopLevel, Type,
+};
 use crate::lexer::token::{Control, Keyword, Operator, Token};
 use crate::{Span, Spanned};
 use chumsky::input::SpannedInput;
@@ -63,16 +65,15 @@ fn function_parser<'tokens, 'src: 'tokens>(
         .then(body)
         .map_with(
             |((((attrs, name), params), ty), (mut body, maybe_expr)), e| {
-                body.0.push(match maybe_expr {
-                    Some(expr) => (Statement::Return(Some(expr.clone())), expr.1),
-                    None => {
-                        let span = (body.1.end..body.1.end).into();
+                body.0.push(if let Some(expr) = maybe_expr {
+                    (Statement::Return(Some(expr.clone())), expr.1)
+                } else {
+                    let span = (body.1.end..body.1.end).into();
 
-                        (
-                            Statement::Return(Some((Expr::Literal((Literal::Unit, span)), span))),
-                            span,
-                        )
-                    }
+                    (
+                        Statement::Return(Some((Expr::Literal((Literal::Unit, span)), span))),
+                        span,
+                    )
                 });
 
                 (

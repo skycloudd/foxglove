@@ -116,8 +116,8 @@ pub enum Literal {
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Literal::Int(i) => write!(f, "{}", i),
-            Literal::Bool(b) => write!(f, "{}", b),
+            Literal::Int(i) => write!(f, "{i}"),
+            Literal::Bool(b) => write!(f, "{b}"),
             Literal::Unit => write!(f, "#"),
         }
     }

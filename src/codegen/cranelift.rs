@@ -1,4 +1,6 @@
-use crate::typechecker::typed_ast::{self, *};
+use crate::typechecker::typed_ast::{
+    self, AttrKind, BinOp, Expr, ExprKind, Literal, Param, PrefixOp, Statement, TopLevel, TypedAst,
+};
 use cranelift::prelude::*;
 use cranelift_module::{FuncId, Linkage, Module};
 use std::collections::HashMap;
@@ -51,7 +53,7 @@ impl<'a> Codegen<'a> {
 
                     let mut translator = FunctionTranslator::new(builder, &mut *self.module);
 
-                    translator.translate(function.body, entry_block, function.params);
+                    translator.translate(function.body, entry_block, &function.params);
 
                     translator.builder.finalize();
 
@@ -135,7 +137,7 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
         &mut self,
         statements: Vec<Statement<'src>>,
         entry_block: Block,
-        params: Vec<Param<'src>>,
+        params: &[Param<'src>],
     ) {
         for (i, param) in params.iter().enumerate() {
             let var = self.variable();
@@ -279,8 +281,8 @@ impl<'a, 'src> FunctionTranslator<'a, 'src> {
             ExprKind::Error => unreachable!(),
             ExprKind::Var(name) => self.builder.use_var(*self.vars.get(name).unwrap()),
             ExprKind::Literal(literal) => match literal {
-                Literal::Int(v) => self.builder.ins().iconst(INT_TYPE, v as i64),
-                Literal::Bool(v) => self.builder.ins().iconst(BOOL_TYPE, v as i64),
+                Literal::Int(v) => self.builder.ins().iconst(INT_TYPE, i64::from(v)),
+                Literal::Bool(v) => self.builder.ins().iconst(BOOL_TYPE, i64::from(v)),
                 Literal::Unit => self.builder.ins().iconst(UNIT_TYPE, 0),
             },
             ExprKind::Prefix { op, expr } => {

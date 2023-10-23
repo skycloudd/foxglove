@@ -128,21 +128,20 @@ fn main() {
 
                     let obj_filename = filename.with_extension("o");
 
-                    let executable_filename = match out {
-                        Some(out) => out,
-                        None => {
-                            let executable_filename: PathBuf = filename
-                                .with_extension(if cfg!(windows) { "exe" } else { "" })
-                                .file_name()
-                                .unwrap()
-                                .into();
+                    let executable_filename = if let Some(out) = out {
+                        out
+                    } else {
+                        let executable_filename: PathBuf = filename
+                            .with_extension(if cfg!(windows) { "exe" } else { "" })
+                            .file_name()
+                            .unwrap()
+                            .into();
 
-                            if executable_filename.exists() {
-                                error!("default output file already exists, please specify an output file with -o");
-                                std::process::exit(1);
-                            } else {
-                                executable_filename
-                            }
+                        if executable_filename.exists() {
+                            error!("default output file already exists, please specify an output file with -o");
+                            std::process::exit(1);
+                        } else {
+                            executable_filename
                         }
                     };
 
@@ -184,14 +183,11 @@ fn main() {
 fn run(input: &str, debug_ast: bool) -> (Option<Spanned<TypedAst>>, Vec<error::Error>) {
     let (tokens, lex_errs) = lexer().parse(input).into_output_errors();
 
-    let (ast, parse_errs) = tokens
-        .as_ref()
-        .map(|tokens| {
-            parser::parser()
-                .parse(tokens.spanned((input.len()..input.len()).into()))
-                .into_output_errors()
-        })
-        .unwrap_or((None, vec![]));
+    let (ast, parse_errs) = tokens.as_ref().map_or((None, vec![]), |tokens| {
+        parser::parser()
+            .parse(tokens.spanned((input.len()..input.len()).into()))
+            .into_output_errors()
+    });
 
     if debug_ast {
         if let Some(ast) = &ast {
@@ -199,13 +195,11 @@ fn run(input: &str, debug_ast: bool) -> (Option<Spanned<TypedAst>>, Vec<error::E
         }
     }
 
-    let (typed_ast, tc_errs) = ast
-        .map(|ast| {
-            let (typed_ast, errs) = typecheck(ast);
+    let (typed_ast, tc_errs) = ast.map_or((None, vec![]), |ast| {
+        let (typed_ast, errs) = typecheck(ast);
 
-            (Some(typed_ast), errs)
-        })
-        .unwrap_or((None, vec![]));
+        (Some(typed_ast), errs)
+    });
 
     let errs = Vec::new()
         .into_iter()
@@ -229,7 +223,7 @@ fn run(input: &str, debug_ast: bool) -> (Option<Spanned<TypedAst>>, Vec<error::E
 
 fn object(typed_ast: TypedAst, opt: OptLevel) -> ObjectProduct {
     let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
-        panic!("host machine is not supported: {}", msg);
+        panic!("host machine is not supported: {msg}");
     });
 
     let mut settings = settings::builder();
@@ -253,7 +247,7 @@ fn object(typed_ast: TypedAst, opt: OptLevel) -> ObjectProduct {
 
 fn jit(typed_ast: TypedAst, opt: OptLevel) -> extern "C" fn() -> i32 {
     let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
-        panic!("host machine is not supported: {}", msg);
+        panic!("host machine is not supported: {msg}");
     });
 
     let mut settings = settings::builder();

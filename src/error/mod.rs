@@ -194,8 +194,8 @@ impl TypecheckError {
             } => (
                 "Type mismatch".to_string(),
                 vec![
-                    ((format!("Type '{:?}' here", ty1), Color::Yellow), *span1),
-                    ((format!("Type '{:?}' here", ty2), Color::Yellow), *span2),
+                    ((format!("Type '{ty1:?}' here"), Color::Yellow), *span1),
+                    ((format!("Type '{ty2:?}' here"), Color::Yellow), *span2),
                 ],
                 None,
             ),
@@ -203,13 +203,13 @@ impl TypecheckError {
                 format!(
                     "Cannot apply operator '{}' to type '{}'",
                     op.fg(Color::Yellow),
-                    format!("{:?}", ty).fg(Color::Yellow)
+                    format!("{ty:?}").fg(Color::Yellow)
                 ),
                 vec![(
                     (
                         format!(
                             "Cannot apply this operator to type '{}'",
-                            format!("{:?}", ty).fg(Color::Yellow)
+                            format!("{ty:?}").fg(Color::Yellow)
                         ),
                         Color::Yellow,
                     ),
@@ -221,15 +221,15 @@ impl TypecheckError {
                 format!(
                     "Cannot apply binary operator '{}' to types '{}' and '{}'",
                     op.fg(Color::Yellow),
-                    format!("{:?}", ty1).fg(Color::Yellow),
-                    format!("{:?}", ty2).fg(Color::Yellow)
+                    format!("{ty1:?}").fg(Color::Yellow),
+                    format!("{ty2:?}").fg(Color::Yellow)
                 ),
                 vec![(
                     (
                         format!(
                             "Cannot apply this operator to types '{}' and '{}'",
-                            format!("{:?}", ty1).fg(Color::Yellow),
-                            format!("{:?}", ty2).fg(Color::Yellow)
+                            format!("{ty1:?}").fg(Color::Yellow),
+                            format!("{ty2:?}").fg(Color::Yellow)
                         ),
                         Color::Yellow,
                     ),
@@ -278,15 +278,15 @@ impl TypecheckError {
             } => (
                 format!(
                     "Main function has wrong return type, expected '{}', found '{}'",
-                    format!("{:?}", expected).fg(Color::Yellow),
-                    format!("{:?}", found).fg(Color::Yellow)
+                    format!("{expected:?}").fg(Color::Yellow),
+                    format!("{found:?}").fg(Color::Yellow)
                 ),
                 vec![(
                     (
                         format!(
                             "Main function has wrong return type, expected '{}', found '{}'",
-                            format!("{:?}", expected).fg(Color::Yellow),
-                            format!("{:?}", found).fg(Color::Yellow)
+                            format!("{expected:?}").fg(Color::Yellow),
+                            format!("{found:?}").fg(Color::Yellow)
                         ),
                         Color::Yellow,
                     ),
@@ -323,7 +323,7 @@ impl TypecheckError {
                     ("Attribute cannot have a value".to_string(), Color::Yellow),
                     *span,
                 )],
-                Some(format!("help: try `#[{}]`", name)),
+                Some(format!("help: try `#[{name}]`")),
             ),
             TypecheckError::MainFunctionCannotBeExtern(span) => (
                 "Main function cannot be extern".to_string(),

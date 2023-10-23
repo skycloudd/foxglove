@@ -40,11 +40,9 @@ impl Engine {
                 Ok(())
             }
 
-            (TypeInfo::Int, TypeInfo::Int) => Ok(()),
-
-            (TypeInfo::Bool, TypeInfo::Bool) => Ok(()),
-
-            (TypeInfo::Unit, TypeInfo::Unit) => Ok(()),
+            (TypeInfo::Int, TypeInfo::Int)
+            | (TypeInfo::Bool, TypeInfo::Bool)
+            | (TypeInfo::Unit, TypeInfo::Unit) => Ok(()),
 
             (a, b) => Err(TypecheckError::TypeMismatch {
                 span1: var_a.1,

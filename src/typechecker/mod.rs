@@ -1,5 +1,8 @@
 use self::engine::{type_to_typeinfo, Engine, TypeId};
-use self::typed_ast::*;
+use self::typed_ast::{
+    Attr, AttrKind, BinOp, Expr, ExprKind, Extern, Function, Literal, Param, PrefixOp, Statement,
+    TopLevel, Type, TypedAst,
+};
 use crate::error::{Error, TypecheckError};
 use crate::parser::ast::{self, Ast};
 use crate::Spanned;
@@ -77,63 +80,15 @@ impl<'a> Typechecker<'a> {
 
         self.bindings.push_scope();
 
-        let mut attrs = vec![];
+        let (attrs, tc_errs) = self.typecheck_attrs(function.0.attrs.0);
 
-        for attr in function.0.attrs.0 {
-            let value =
-                attr.0
-                    .value
-                    .as_ref()
-                    .map(|value| match self.typecheck_expr(value.clone()) {
-                        Ok(value) => value.0,
-                        Err(err) => {
-                            errors.push(err);
-
-                            Expr {
-                                expr: ExprKind::Error,
-                                ty: Type::Unit,
-                            }
-                        }
-                    });
-
-            let kind = match attr.0.name.0 {
-                "export" => AttrKind::Export,
-                _ => {
-                    errors.push(
-                        TypecheckError::UnknownAttribute {
-                            span: attr.0.name.1,
-                            name: attr.0.name.0.to_string(),
-                        }
-                        .into(),
-                    );
-
-                    AttrKind::Error
-                }
-            };
-
-            match kind {
-                AttrKind::Error => {}
-                AttrKind::Export => {
-                    if let Some((_, span)) = attr.0.value {
-                        errors.push(
-                            TypecheckError::AttributeHasValue {
-                                span,
-                                name: attr.0.name.0.to_string(),
-                            }
-                            .into(),
-                        );
-                    }
-                }
-            }
-
-            attrs.push(Attr { kind, value });
-        }
+        errors.extend(tc_errs);
 
         let mut params = vec![];
         let mut param_types = vec![];
 
         for param in &function.0.params.0 {
-            let ty = self.lower_type(param.0.ty);
+            let ty = Self::lower_type(param.0.ty);
             let ty_id = self.engine.insert(type_to_typeinfo(ty));
 
             param_types.push(ty_id);
@@ -146,7 +101,7 @@ impl<'a> Typechecker<'a> {
             });
         }
 
-        let ret_ty_type = self.lower_type(function.0.ty);
+        let ret_ty_type = Self::lower_type(function.0.ty);
         let ret_ty = self.engine.insert(type_to_typeinfo(ret_ty_type));
 
         if function.0.name.0 == "main" {
@@ -205,9 +160,57 @@ impl<'a> Typechecker<'a> {
     ) -> (Spanned<Extern<'src>>, Vec<Error>) {
         let mut errors = vec![];
 
-        let mut attrs = vec![];
+        let (attrs, tc_errs) = self.typecheck_attrs(extern_.0.attrs.0);
 
-        for attr in extern_.0.attrs.0 {
+        errors.extend(tc_errs);
+
+        let mut params = vec![];
+        let mut param_types = vec![];
+
+        for param in &extern_.0.params.0 {
+            let ty = Self::lower_type(param.0.ty);
+            let ty_id = self.engine.insert(type_to_typeinfo(ty));
+
+            param_types.push(ty_id);
+
+            params.push(Param {
+                name: param.0.name.0,
+                ty: ty.0,
+            });
+        }
+
+        let ret_ty_type = Self::lower_type(extern_.0.ty);
+        let ret_ty = self.engine.insert(type_to_typeinfo(ret_ty_type));
+
+        if extern_.0.name.0 == "main" {
+            errors.push(TypecheckError::MainFunctionCannotBeExtern(extern_.0.name.1).into());
+        }
+
+        self.fns.insert(extern_.0.name.0, (param_types, ret_ty));
+
+        (
+            (
+                Extern {
+                    attrs,
+                    name: extern_.0.name.0,
+                    params,
+                    ty: ret_ty_type.0,
+                },
+                extern_.1,
+            ),
+            errors,
+        )
+    }
+
+    fn typecheck_attrs<'src>(
+        &mut self,
+        attrs: Vec<Spanned<ast::Attr<'src>>>,
+    ) -> (Vec<Attr<'src>>, Vec<Error>) {
+        let mut errors = vec![];
+
+        let mut tc_attrs = vec![];
+
+        for attr in attrs {
             let value =
                 attr.0
                     .value
@@ -254,45 +257,10 @@ impl<'a> Typechecker<'a> {
                 }
             }
 
-            attrs.push(Attr { kind, value });
+            tc_attrs.push(Attr { kind, value });
         }
 
-        let mut params = vec![];
-        let mut param_types = vec![];
-
-        for param in &extern_.0.params.0 {
-            let ty = self.lower_type(param.0.ty);
-            let ty_id = self.engine.insert(type_to_typeinfo(ty));
-
-            param_types.push(ty_id);
-
-            params.push(Param {
-                name: param.0.name.0,
-                ty: ty.0,
-            });
-        }
-
-        let ret_ty_type = self.lower_type(extern_.0.ty);
-        let ret_ty = self.engine.insert(type_to_typeinfo(ret_ty_type));
-
-        if extern_.0.name.0 == "main" {
-            errors.push(TypecheckError::MainFunctionCannotBeExtern(extern_.0.name.1).into());
-        }
-
-        self.fns.insert(extern_.0.name.0, (param_types, ret_ty));
-
-        (
-            (
-                Extern {
-                    attrs,
-                    name: extern_.0.name.0,
-                    params,
-                    ty: ret_ty_type.0,
-                },
-                extern_.1,
-            ),
-            errors,
-        )
+        (tc_attrs, errors)
     }
 
     fn typecheck_statement<'src: 'a>(
@@ -325,7 +293,7 @@ impl<'a> Typechecker<'a> {
                     let value = self.typecheck_expr(value)?;
                     let value_ty = self.engine.insert(type_to_typeinfo((value.0.ty, value.1)));
 
-                    let ty = ty.map(|ty| self.lower_type(ty));
+                    let ty = ty.map(Self::lower_type);
 
                     let ty = match ty {
                         Some(ty) => {
@@ -375,17 +343,17 @@ impl<'a> Typechecker<'a> {
                     Statement::Loop(Box::new(stmt.0))
                 }
                 ast::Statement::Continue => {
-                    if !self.is_in_loop {
-                        return Err(TypecheckError::ContinueOutsideOfLoop(stmt.1).into());
-                    } else {
+                    if self.is_in_loop {
                         Statement::Continue
+                    } else {
+                        return Err(TypecheckError::ContinueOutsideOfLoop(stmt.1).into());
                     }
                 }
                 ast::Statement::Break => {
-                    if !self.is_in_loop {
-                        return Err(TypecheckError::BreakOutsideOfLoop(stmt.1).into());
-                    } else {
+                    if self.is_in_loop {
                         Statement::Break
+                    } else {
+                        return Err(TypecheckError::BreakOutsideOfLoop(stmt.1).into());
                     }
                 }
                 ast::Statement::Return(expr) => {
@@ -492,7 +460,7 @@ impl<'a> Typechecker<'a> {
                     }
                 }
                 ast::Expr::Literal(literal) => {
-                    let literal = self.lower_literal(literal);
+                    let literal = Self::lower_literal(literal);
 
                     Expr {
                         expr: ExprKind::Literal(literal.0),
@@ -500,7 +468,7 @@ impl<'a> Typechecker<'a> {
                     }
                 }
                 ast::Expr::Prefix { op, expr } => {
-                    let op = self.lower_prefix_operator(op);
+                    let op = Self::lower_prefix_operator(op);
 
                     let expr = self.typecheck_expr(*expr)?;
                     let expr_id = self.engine.insert(type_to_typeinfo((expr.0.ty, expr.1)));
@@ -517,7 +485,7 @@ impl<'a> Typechecker<'a> {
                     }
                 }
                 ast::Expr::Binary { op, lhs, rhs } => {
-                    let op = self.lower_binary_operator(op);
+                    let op = Self::lower_binary_operator(op);
 
                     let lhs = self.typecheck_expr(*lhs)?;
                     let lhs_id = self.engine.insert(type_to_typeinfo((lhs.0.ty, lhs.1)));
@@ -530,7 +498,7 @@ impl<'a> Typechecker<'a> {
                     let lhs_ty = self.engine.reconstruct(lhs_id)?;
                     let rhs_ty = self.engine.reconstruct(rhs_id)?;
 
-                    let ty = lhs_ty.0.get_binary_type(op, &rhs_ty.0)?;
+                    let ty = lhs_ty.0.get_binary_type(op, rhs_ty.0)?;
 
                     Expr {
                         expr: ExprKind::Binary {
@@ -586,7 +554,7 @@ impl<'a> Typechecker<'a> {
         ))
     }
 
-    fn lower_literal(&self, literal: Spanned<ast::Literal>) -> Spanned<Literal> {
+    fn lower_literal(literal: Spanned<ast::Literal>) -> Spanned<Literal> {
         (
             match literal.0 {
                 ast::Literal::Int(n) => Literal::Int(n),
@@ -597,7 +565,7 @@ impl<'a> Typechecker<'a> {
         )
     }
 
-    fn lower_prefix_operator(&self, op: Spanned<ast::PrefixOp>) -> Spanned<PrefixOp> {
+    fn lower_prefix_operator(op: Spanned<ast::PrefixOp>) -> Spanned<PrefixOp> {
         (
             match op.0 {
                 ast::PrefixOp::Negate => PrefixOp::Negate,
@@ -606,7 +574,7 @@ impl<'a> Typechecker<'a> {
         )
     }
 
-    fn lower_binary_operator(&self, op: Spanned<ast::BinOp>) -> Spanned<BinOp> {
+    fn lower_binary_operator(op: Spanned<ast::BinOp>) -> Spanned<BinOp> {
         (
             match op.0 {
                 ast::BinOp::Add => BinOp::Add,
@@ -626,7 +594,7 @@ impl<'a> Typechecker<'a> {
         )
     }
 
-    fn lower_type(&self, ty: Spanned<ast::Type>) -> Spanned<Type> {
+    fn lower_type(ty: Spanned<ast::Type>) -> Spanned<Type> {
         (
             match ty.0 {
                 ast::Type::Int => Type::Int,
@@ -670,7 +638,7 @@ impl<K: Eq + Hash, V> Scopes<K, V> {
 }
 
 impl Type {
-    fn get_prefix_type(&self, op: Spanned<PrefixOp>) -> Result<Type, Error> {
+    fn get_prefix_type(self, op: Spanned<PrefixOp>) -> Result<Type, Error> {
         match self {
             Type::Int => match op.0 {
                 PrefixOp::Negate => Ok(Type::Int),
@@ -678,13 +646,13 @@ impl Type {
             Type::Bool | Type::Unit => Err(TypecheckError::CannotApplyUnaryOperator {
                 span: op.1,
                 op: op.0,
-                ty: *self,
+                ty: self,
             }
             .into()),
         }
     }
 
-    fn get_binary_type(&self, op: Spanned<BinOp>, rhs: &Type) -> Result<Type, Error> {
+    fn get_binary_type(self, op: Spanned<BinOp>, rhs: Type) -> Result<Type, Error> {
         let lhs = self;
 
         match (lhs, rhs) {
@@ -700,8 +668,8 @@ impl Type {
                     Err(TypecheckError::CannotApplyBinaryOperator {
                         span: op.1,
                         op: op.0,
-                        ty1: *lhs,
-                        ty2: *rhs,
+                        ty1: lhs,
+                        ty2: rhs,
                     }
                     .into())
                 }
@@ -711,8 +679,8 @@ impl Type {
                     Err(TypecheckError::CannotApplyBinaryOperator {
                         span: op.1,
                         op: op.0,
-                        ty1: *lhs,
-                        ty2: *rhs,
+                        ty1: lhs,
+                        ty2: rhs,
                     }
                     .into())
                 }
@@ -728,8 +696,8 @@ impl Type {
             (lhs, rhs) => Err(TypecheckError::CannotApplyBinaryOperator {
                 span: op.1,
                 op: op.0,
-                ty1: *lhs,
-                ty2: *rhs,
+                ty1: lhs,
+                ty2: rhs,
             }
             .into()),
         }
@@ -737,7 +705,7 @@ impl Type {
 }
 
 impl Literal {
-    fn ty(&self) -> Type {
+    fn ty(self) -> Type {
         match self {
             Literal::Int(_) => Type::Int,
             Literal::Bool(_) => Type::Bool,

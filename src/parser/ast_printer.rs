@@ -1,4 +1,6 @@
-use super::ast::*;
+use super::ast::{
+    Ast, Attr, BinOp, Expr, Extern, Function, Literal, Param, PrefixOp, Statement, TopLevel, Type,
+};
 use ptree::TreeItem;
 use std::borrow::Cow;
 
@@ -265,7 +267,6 @@ impl TreeItem for AstNode<'_> {
                 vec![param.name.0.to_string().into(), param.ty.0.into()]
             }
             AstNode::Statement(statement) => match statement {
-                Statement::Error => vec![],
                 Statement::Expr(expr) => vec![expr.0.clone().into()],
                 Statement::Block(statements) => statements
                     .0
@@ -287,8 +288,7 @@ impl TreeItem for AstNode<'_> {
                     vec![AstNode::Var(name.0.to_string()), value.0.clone().into()]
                 }
                 Statement::Loop(statement) => vec![statement.0.clone().into()],
-                Statement::Continue => vec![],
-                Statement::Break => vec![],
+                Statement::Error | Statement::Continue | Statement::Break => vec![],
                 Statement::Return(maybe_expression) => {
                     if let Some(expression) = maybe_expression {
                         vec![expression.0.clone().into()]
